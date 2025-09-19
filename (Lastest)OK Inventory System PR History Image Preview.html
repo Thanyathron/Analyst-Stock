@@ -1,0 +1,1209 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ระบบคลังสินค้า - Enhanced Import/Export v2</title>
+  <style>
+    *{box-sizing:border-box}
+    body{font-family:'Sarabun','Tahoma',sans-serif;background:#f4f6f8;margin:0;padding:20px}
+    .container{max-width:1200px;margin:0 auto;background:#fff;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.08);overflow:hidden}
+    .header{background:linear-gradient(45deg,#4CAF50,#2E7D32);color:#fff;padding:18px 20px}
+    .header h1{margin:0;font-size:22px}
+    .mode-selector{display:flex;gap:10px;flex-wrap:wrap;padding:14px 16px;border-bottom:1px solid #eee;background:#fafafa}
+    .mode-btn{appearance:none;border:1px solid #e0e0e0;background:#fff;border-radius:999px;padding:10px 16px;font-size:14px;color:#333;cursor:pointer;transition:all .2s}
+    .mode-btn.active{background:#4CAF50;border-color:#4CAF50;color:#fff}
+    .mode-content{display:none;padding:16px}
+    .mode-content.active{display:block}
+    .subtabs{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 14px}
+    .subtab-btn{appearance:none;border:1px solid #e0e0e0;background:#fff;border-radius:999px;padding:8px 12px;font-size:13px;color:#333;cursor:pointer}
+    .subtab-btn.active{background:#2196F3;border-color:#2196F3;color:#fff}
+    .subtab-content{display:none}
+    .subtab-content.active{display:block}
+    .form-row{display:flex;gap:12px;flex-wrap:wrap}
+    .form-group{flex:1;min-width:220px}
+    label{display:block;margin-bottom:6px;font-weight:600;color:#333}
+    input[type="text"],input[type="number"],textarea,select{width:100%;padding:10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px}
+    input[type="file"]{width:100%;}
+    textarea{resize:vertical}
+    .actions{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+    .btn{border:none;border-radius:8px;padding:10px 14px;font-size:14px;color:#fff;background:#4CAF50;cursor:pointer}
+    .btn.secondary{background:#2196F3}
+    .btn.danger{background:#F44336}
+    .btn.warning{background:#FF9800}
+    .btn.gray{background:#607D8B}
+    .btn.light{background:#9E9E9E}
+    .btn.silver{background:#9E9E9E}
+    .btn:disabled{background:#ccc;cursor:not-allowed}
+    .table-container{overflow-x:auto;margin-top:10px}
+    table{width:100%;border-collapse:collapse;background:#fff}
+    th,td{padding:10px;border-bottom:1px solid #eee;text-align:left;font-size:14px;vertical-align:middle}
+    th{background:#fafafa}
+    .thumb{width:44px;height:44px;object-fit:cover;border-radius:6px;border:1px solid #eee;cursor:zoom-in}
+    .status-badge{padding:2px 8px;border-radius:12px;font-size:12px;font-weight:700;display:inline-block}
+    .status-ok{background:#d4edda;color:#1b5e20}
+    .status-buy{background:#fff3cd;color:#7a5d00}
+    .status-pending{background:#e3f2fd;color:#0d47a1}
+    .status-done{background:#e8f5e9;color:#1b5e20}
+    .status-approved{background:#d4edda;color:#1b5e20}
+    .status-rejected{background:#ffebee;color:#b71c1c}
+    .status-ordered{background:#fff3cd;color:#7a5d00}
+    .hint{font-size:12px;color:#777;margin-top:4px}
+    .muted{color:#777;font-size:12px}
+    .divider{height:1px;background:#eee;margin:8px 0}
+    .modal{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center;z-index:9999}
+    .modal img{max-width:90vw;max-height:90vh;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+    <h1>📦 ระบบจัดการคลังสินค้า</h1>
+    <div>SPR, PR และ Stock พร้อม Admin แยก, Import/Export, รูปภาพ</div>
+    </div>
+
+    <div class="mode-selector" id="modeSelector">
+    <button class="mode-btn active" data-target="#spr-mode">📋 SPR Mode</button>
+    <button class="mode-btn" data-target="#pr-mode">🛒 PR Mode</button>
+    <button class="mode-btn" data-target="#stock-mode">📦 Stock</button>
+    </div>
+
+    <!-- SPR -->
+    <div id="spr-mode" class="mode-content active">
+    <h3>SPR - ใบเบิกออกจากคลัง</h3>
+    <div class="actions" style="margin-top:0">
+    <button class="btn gray" id="btn-spr-admin-login">🔐 เข้าสู่ระบบ Admin (SPR) — รหัส: spr123</button>
+    <button class="btn light" id="btn-spr-admin-logout">🚪 ออกจากระบบ (SPR)</button>
+    <button class="btn warning" id="btn-spr-change-pass" disabled>🔑 ตั้งรหัสใหม่ (SPR)</button>
+    <span id="spr-admin-state" class="muted">สถานะ SPR: ผู้ใช้ทั่วไป</span>
+    </div>
+
+    <div class="subtabs" id="sprSubtabs">
+    <button class="subtab-btn active" data-target="#spr-cart">SPR Cart</button>
+    <button class="subtab-btn" data-target="#spr-history">History</button>
+    </div>
+
+    <!-- SPR Cart -->
+    <div id="spr-cart" class="subtab-content active">
+    <div class="form-row">
+    <div class="form-group">
+    <label>ค้นหา (รหัส/ชื่อ)</label>
+    <input type="text" id="spr-search" placeholder="ค้นหาจากรหัส หรือ ชื่อสินค้า" />
+    <label style="margin-top:8px">เลือกสินค้า</label>
+    <select id="spr-product-select"></select>
+    </div>
+    <div class="form-group">
+    <label>จำนวน</label>
+    <input type="number" id="spr-quantity" min="1" value="1" />
+    </div>
+    </div>
+    <div class="form-group">
+    <label>ชื่อผู้เบิก</label>
+    <input type="text" id="spr-requester" placeholder="ไม่ระบุได้" />
+    </div>
+    <div class="actions">
+    <button class="btn" id="spr-add">➕ เพิ่มลง SPR Cart</button>
+    <div class="divider"></div>
+    <button class="btn secondary" id="spr-export-cart">📤 Export SPR Cart (CSV)</button>
+    <button class="btn silver" id="spr-import-cart">📥 Import SPR Cart (CSV)</button>
+    </div>
+    <div class="table-container">
+    <table>
+    <thead>
+    <tr>
+    <th>#</th><th>รูป</th><th>รหัสสินค้า</th><th>ชื่อสินค้า</th><th>จำนวน</th><th>ผู้เบิก</th><th>สถานะ</th><th>เวลา</th><th>จัดการ</th>
+    </tr>
+    </thead>
+    <tbody id="spr-body"><tr><td colspan="9" style="text-align:center;color:#777">ยังไม่มีรายการ</td></tr></tbody>
+    </table>
+    </div>
+    <div class="muted">หมายเหตุ: ปุ่ม "เปลี่ยนสถานะ" และ "ลบ" ใช้ได้เฉพาะ Admin SPR</div>
+    </div>
+
+    <!-- SPR History -->
+    <div id="spr-history" class="subtab-content">
+    <div class="actions">
+    <button class="btn secondary" id="spr-export-history">📤 Export SPR History (CSV)</button>
+    <button class="btn silver" id="spr-import-history">📥 Import SPR History (CSV)</button>
+    </div>
+    <div class="table-container">
+    <table>
+    <thead>
+    <tr>
+    <th>#</th><th>รูป</th><th>วันที่</th><th>ผู้เบิก</th><th>รหัสสินค้า</th><th>ชื่อสินค้า</th><th>จำนวน</th><th>สถานะ</th>
+    </tr>
+    </thead>
+    <tbody id="spr-history-body"><tr><td colspan="8" style="text-align:center;color:#777">ยังไม่มีประวัติ SPR</td></tr></tbody>
+    </table>
+    </div>
+    <div class="muted">หมายเหตุ: ปุ่ม "ลบ" ใช้ได้เฉพาะ Admin SPR</div>
+    </div>
+    </div>
+
+    <!-- PR -->
+    <div id="pr-mode" class="mode-content">
+    <h3>PR - คำร้องขอสั่งซื้อ</h3>
+    <div class="actions" style="margin-top:0">
+    <button class="btn gray" id="btn-pr-admin-login">🔐 เข้าสู่ระบบ Admin (PR) — รหัส: admin123</button>
+    <button class="btn light" id="btn-pr-admin-logout">🚪 ออกจากระบบ (PR)</button>
+    <button class="btn warning" id="btn-pr-change-pass" disabled>🔑 ตั้งรหัสใหม่ (PR)</button>
+    <span id="pr-admin-state" class="muted">สถานะ PR: ผู้ใช้ทั่วไป</span>
+    </div>
+
+    <div class="subtabs" id="prSubtabs">
+    <button class="subtab-btn active" data-target="#pr-cart">PR Cart</button>
+    <button class="subtab-btn" data-target="#pr-history">History</button>
+    </div>
+
+    <!-- PR Cart -->
+    <div id="pr-cart" class="subtab-content active">
+    <div class="form-row">
+    <div class="form-group">
+    <label>รหัสสินค้า</label>
+    <input type="text" id="pr-code" placeholder="เช่น ITEM001" />
+    </div>
+    <div class="form-group">
+    <label>ชื่อสินค้า</label>
+    <input type="text" id="pr-name" placeholder="ปล่อยว่างให้ระบบเติมให้อัตโนมัติ" />
+    <div class="hint">ถ้าไม่กรอก ระบบจะเติมจากคลังให้</div>
+    </div>
+    <div class="form-group">
+    <label>จำนวน</label>
+    <input type="number" id="pr-qty" min="1" value="1" />
+    </div>
+    <div class="form-group">
+    <label>รูปภาพ</label>
+    <input type="file" id="pr-image" accept="image/*" />
+    </div>
+    </div>
+    <div class="form-row">
+    <div class="form-group">
+    <label>ชื่อผู้ขอ</label>
+    <input type="text" id="pr-requester" placeholder="ไม่ระบุก็ได้" />
+    </div>
+    <div class="form-group">
+    <label>Code Job</label>
+    <input type="text" id="pr-job" />
+    </div>
+    <div class="form-group">
+    <label>Remark</label>
+    <input type="text" id="pr-remark" />
+    </div>
+    </div>
+    <div class="actions">
+    <button class="btn" id="pr-add">➕ เพิ่มลง PR Cart</button>
+    <div class="divider"></div>
+    <button class="btn secondary" id="pr-export-cart">📤 Export PR Cart (CSV)</button>
+    <button class="btn silver" id="pr-import-cart">📥 Import PR Cart (CSV)</button>
+    </div>
+    <div class="table-container">
+    <table>
+    <thead>
+    <tr>
+    <th>#</th><th>รูป</th><th>รหัสสินค้า</th><th>ชื่อสินค้า</th><th>จำนวน</th><th>ผู้ขอ</th><th>Job</th><th>Remark</th><th>เวลา</th><th>สถานะ</th><th>การดำเนินการ</th>
+    </tr>
+    </thead>
+    <tbody id="pr-body"><tr><td colspan="11" style="text-align:center;color:#777">ยังไม่มีรายการ</td></tr></tbody>
+    </table>
+    </div>
+    <div class="muted">หมายเหตุ: ปุ่ม "เปลี่ยนสถานะ" และ "ลบ" ใช้ได้เฉพาะ Admin PR</div>
+    </div>
+
+    <!-- PR History -->
+    <div id="pr-history" class="subtab-content">
+    <div class="actions">
+    <button class="btn secondary" id="pr-export-history">📤 Export PR History (CSV)</button>
+    <button class="btn silver" id="pr-import-history">📥 Import PR History (CSV)</button>
+    </div>
+    <div class="table-container">
+    <table>
+    <thead>
+    <tr>
+    <th>#</th><th>รูป</th><th>วันที่</th><th>ผู้เบิก</th><th>รหัสสินค้า</th><th>ชื่อสินค้า</th><th>จำนวน</th><th>สถานะ</th><th>การดำเนินการ</th>
+    </tr>
+    </thead>
+    <tbody id="pr-history-body"><tr><td colspan="9" style="text-align:center;color:#777">ยังไม่มีประวัติ PR</td></tr></tbody>
+    </table>
+    </div>
+    </div>
+    </div>
+
+    <!-- Stock -->
+    <div id="stock-mode" class="mode-content">
+    <h3>Stock - คลังสินค้า</h3>
+    <div class="actions" style="margin-top:0">
+    <button class="btn gray" id="btn-stock-admin-login">🔐 เข้าสู่ระบบ Admin (Stock) — admin1: stock111, admin2: stock222</button>
+    <button class="btn light" id="btn-stock-admin-logout">🚪 ออกจากระบบ (Stock)</button>
+    <button class="btn warning" id="btn-stock-change-pass" disabled>🔑 ตั้งรหัสใหม่ (Stock)</button>
+    <span id="stock-admin-state" class="muted">สถานะ Stock: ผู้ใช้ทั่วไป</span>
+    </div>
+    <div class="subtabs" id="stockSubtabs">
+    <button class="subtab-btn active" data-target="#stock-items">สินค้า</button>
+    <button class="subtab-btn" data-target="#stock-history">History</button>
+    </div>
+
+    <!-- Subtab: Items -->
+    <div id="stock-items" class="subtab-content active">
+    <div class="form-row">
+    <div class="form-group">
+    <label>รหัสสินค้า (รองรับบาร์โค้ด — สแกนแล้วกด Enter)</label>
+    <input type="text" id="st-code" />
+    </div>
+    <div class="form-group">
+    <label>ชื่อสินค้า</label>
+    <input type="text" id="st-name" />
+    </div>
+    <div class="form-group">
+    <label>จำนวน (รองรับ +5 / -3 / หรือ 20)</label>
+    <input type="text" id="st-qty" value="1" />
+    </div>
+    <div class="form-group">
+    <label>ราคา</label>
+    <input type="number" id="st-price" min="0" step="0.01" />
+    </div>
+    <div class="form-group">
+    <label>Minimum Stock (ชิ้น)</label>
+    <input type="number" id="st-min" min="0" step="1" placeholder="0" />
+    </div>
+    <div class="form-group">
+    <label>รูปภาพสินค้า</label>
+    <input type="file" id="st-image" accept="image/*" />
+    </div>
+    </div>
+    <div class="actions">
+    <button class="btn" id="st-add" disabled>➕ เพิ่มเข้าคลัง (บวกจำนวนถ้ามีอยู่แล้ว)</button>
+    <button class="btn warning" id="st-update" disabled>🔄 อัปเดต (รองรับ + / - / เซ็ตค่า + ปรับ Min)</button>
+    <button class="btn secondary" id="st-export">📤 Export สต็อก</button>
+    <button class="btn silver" id="st-import">📥 Import สต็อก</button>
+    <button class="btn danger" id="st-clear" disabled>🗑️ ล้างคลัง</button>
+    </div>
+    <div class="table-container">
+    <table>
+    <thead>
+    <tr>
+    <th>รหัส</th><th>รูป</th><th>ชื่อ</th><th>ราคา</th><th>จำนวน</th><th>Minimum</th><th>สถานะ</th><th>มูลค่า</th><th>อัพเดท</th><th>จัดการ</th>
+    </tr>
+    </thead>
+    <tbody id="st-body"><tr><td colspan="10" style="text-align:center;color:#777">ยังไม่มีสินค้า</td></tr></tbody>
+    </table>
+    </div>
+    <div class="muted">หมายเหตุ: ต้องเข้าสู่ระบบ Admin (admin1 หรือ admin2) เท่านั้น ถึงจะเพิ่ม/ลบ/อัปเดตสินค้าได้</div>
+    </div>
+
+    <!-- Subtab: History -->
+    <div id="stock-history" class="subtab-content">
+    <div class="actions">
+    <button class="btn secondary" id="his-export">📤 Export History</button>
+    <button class="btn danger" id="his-clear" disabled>🗑️ ล้างประวัติ</button>
+    </div>
+    <div class="table-container">
+    <table>
+    <thead>
+    <tr>
+    <th>เวลา</th><th>รูป</th><th>รหัสสินค้า</th><th>ชื่อ</th><th>การเปลี่ยนแปลง</th><th>ประเภท</th><th>ผู้ทำรายการ</th><th>ลบ</th>
+    </tr>
+    </thead>
+    <tbody id="his-body"><tr><td colspan="8" style="text-align:center;color:#777">ยังไม่มีประวัติ</td></tr></tbody>
+    </table>
+    </div>
+    <div class="muted">หมายเหตุ: ต้องเข้าสู่ระบบ Admin (admin1 หรือ admin2) เท่านั้น ถึงจะล้างประวัติได้</div>
+    </div>
+    </div>
+  </div>
+
+  <!-- Image modal -->
+  <div id="imgModal" class="modal" onclick="this.style.display='none'">
+    <img id="imgModalPic" src="" alt="preview" />
+  </div>
+
+  <script>
+    // ---- State ----
+    let stock = JSON.parse(localStorage.getItem('stockData')||'[]');
+    let spr = JSON.parse(localStorage.getItem('sprCart')||'[]');
+    let sprHistory = JSON.parse(localStorage.getItem('sprHistory')||'[]');
+    let pr = JSON.parse(localStorage.getItem('prCart')||'[]');
+    let prHistory = JSON.parse(localStorage.getItem('prHistory')||'[]');
+    let stockHistory = JSON.parse(localStorage.getItem('stockHistory')||'[]');
+
+    if(!localStorage.getItem('prAdminPass')) localStorage.setItem('prAdminPass','admin123');
+    if(!localStorage.getItem('sprAdminPass')) localStorage.setItem('sprAdminPass','spr123');
+    if(!localStorage.getItem('stockAdmin1Pass')) localStorage.setItem('stockAdmin1Pass','stock111');
+    if(!localStorage.getItem('stockAdmin2Pass')) localStorage.setItem('stockAdmin2Pass','stock222');
+
+    let isPRAdmin = sessionStorage.getItem('isPRAdmin') === 'true';
+    let isSPRAdmin = sessionStorage.getItem('isSPRAdmin') === 'true';
+    let isStockAdmin = sessionStorage.getItem('isStockAdmin') === 'true';
+    let stockAdminUser = sessionStorage.getItem('stockAdminUser') || null; // 'admin1' | 'admin2'
+
+    if(stock.length===0){
+    stock = [
+    {code:'ITEM001',name:'ปากกา',price:15.5,quantity:5,minQty:10,lastUpdate:new Date().toLocaleString('th-TH'),imageData:''},
+    {code:'ITEM002',name:'กระดาษ A4',price:120,quantity:25,minQty:10,lastUpdate:new Date().toLocaleString('th-TH'),imageData:''},
+    {code:'ITEM003',name:'คลิปหนีบกระดาษ',price:8,quantity:100,minQty:30,lastUpdate:new Date().toLocaleString('th-TH'),imageData:''}
+    ];
+    persist();
+    }
+
+    // ---- Helpers ----
+    function persist(){
+    localStorage.setItem('stockData', JSON.stringify(stock));
+    localStorage.setItem('sprCart', JSON.stringify(spr));
+    localStorage.setItem('sprHistory', JSON.stringify(sprHistory));
+    localStorage.setItem('prCart', JSON.stringify(pr));
+    localStorage.setItem('prHistory', JSON.stringify(prHistory));
+    localStorage.setItem('stockHistory', JSON.stringify(stockHistory));
+    }
+    const PAGE_SIZE = 100;
+    let sprHistPage = parseInt(sessionStorage.getItem('sprHistPage')||'1');
+    let prHistPage = parseInt(sessionStorage.getItem('prHistPage')||'1');
+    let stockHistPage = parseInt(sessionStorage.getItem('stockHistPage')||'1');
+
+    function clampPage(p, total){ return Math.min(Math.max(1,p), Math.max(1,total)); }
+    function ensurePager(sectionSelector, pagerId){
+    const sec = document.querySelector(sectionSelector);
+    if(!sec) return null;
+    let el = document.getElementById(pagerId);
+    if(!el){
+    el = document.createElement('div');
+    el.id = pagerId;
+    el.className = 'muted';
+    el.style.display = 'flex';
+    el.style.gap = '8px';
+    el.style.alignItems = 'center';
+    el.style.marginTop = '8px';
+    sec.appendChild(el);
+    }
+    return el;
+    }
+    function renderPager(el, page, total, prevHandler, nextHandler){
+    if(!el) return;
+    const disabledPrev = page <= 1 ? 'disabled' : '';
+    const disabledNext = page >= total ? 'disabled' : '';
+    el.innerHTML = `
+    <button class="btn light" style="padding:6px 10px;font-size:12px" ${disabledPrev} onclick="${prevHandler}()">ย้อนกลับ</button>
+    <span>หน้า ${page} / ${total}</span>
+    <button class="btn light" style="padding:6px 10px;font-size:12px" ${disabledNext} onclick="${nextHandler}()">ถัดไป</button>
+    `;
+    }
+
+    function sprPrevPage(){ sprHistPage = Math.max(1, sprHistPage-1); sessionStorage.setItem('sprHistPage', String(sprHistPage)); renderSPRHistory(); }
+    function sprNextPage(){ const total = Math.max(1, Math.ceil(sprHistory.length / PAGE_SIZE)); sprHistPage = Math.min(total, sprHistPage+1); sessionStorage.setItem('sprHistPage', String(sprHistPage)); renderSPRHistory(); }
+    window.sprPrevPage = sprPrevPage; window.sprNextPage = sprNextPage;
+
+    function prPrevPage(){ prHistPage = Math.max(1, prHistPage-1); sessionStorage.setItem('prHistPage', String(prHistPage)); renderPRHistory(); }
+    function prNextPage(){ const total = Math.max(1, Math.ceil(prHistory.length / PAGE_SIZE)); prHistPage = Math.min(total, prHistPage+1); sessionStorage.setItem('prHistPage', String(prHistPage)); renderPRHistory(); }
+    window.prPrevPage = prPrevPage; window.prNextPage = prNextPage;
+
+    function stPrevPage(){ stockHistPage = Math.max(1, stockHistPage-1); sessionStorage.setItem('stockHistPage', String(stockHistPage)); renderHistory(); }
+    function stNextPage(){ const total = Math.max(1, Math.ceil(stockHistory.length / PAGE_SIZE)); stockHistPage = Math.min(total, stockHistPage+1); sessionStorage.setItem('stockHistPage', String(stockHistPage)); renderHistory(); }
+    window.stPrevPage = stPrevPage; window.stNextPage = stNextPage;
+
+    function fmt(n){ return Number(n||0).toLocaleString('th-TH',{maximumFractionDigits:2}); }
+    function statusObj(item){
+    const min = Number(item.minQty||0);
+    const qty = Number(item.quantity||0);
+    const needBuy = qty < min;
+    return { needBuy, text: needBuy ? 'สั่งซื้อ' : 'ปกติ', cls: needBuy ? 'status-buy' : 'status-ok' };
+    }
+    function prStatusBadge(st){
+    const map = { pending: {text:'รอดำเนินการ', cls:'status-pending'}, approved:{text:'อนุมัติ', cls:'status-approved'}, rejected:{text:'ปฏิเสธ', cls:'status-rejected'}, ordered:{text:'สั่งซื้อแล้ว', cls:'status-ordered'} };
+    const m = map[st] || map['pending'];
+    return `<span class="status-badge ${m.cls}">${m.text}</span>`;
+    }
+    function getStockSorted(){
+    return [...stock].sort((a,b)=> a.name.localeCompare(b.name,'th',{numeric:true,sensitivity:'base'}));
+    }
+    function logStockHistory(type, code, name, change){
+    stockHistory.push({ time:new Date().toLocaleString('th-TH'), type, code, name, change, admin: stockAdminUser || 'guest' });
+    persist();
+    }
+    function fillSPRSelect(){
+    const sel = document.getElementById('spr-product-select');
+    if(!sel) return;
+    const sorted = getStockSorted();
+    sel.innerHTML = '<option value="">-- เลือกสินค้า --</option>' + sorted.map(s=>`<option value="${s.code}">${s.name} — ${s.code} (คงเหลือ ${s.quantity})</option>`).join('');
+    
+    // If search box exists, wire up input event to filter options
+    const search = document.getElementById('spr-search');
+    if(search){
+      search.removeEventListener('input', sprSearchHandler);
+      search.addEventListener('input', sprSearchHandler);
+    }
+    }
+
+    function sprSearchHandler(e){
+      const q = (e.target.value||'').trim().toLowerCase();
+      const sel = document.getElementById('spr-product-select');
+      if(!sel) return;
+      const sorted = getStockSorted();
+      if(q===''){
+        sel.innerHTML = '<option value="">-- เลือกสินค้า --</option>' + sorted.map(s=>`<option value="${s.code}">${s.name} — ${s.code} (คงเหลือ ${s.quantity})</option>`).join('');
+        return;
+      }
+      // lenient matching: match if code or name contains query (case-insensitive)
+      const filtered = sorted.filter(s=> (s.code||'').toLowerCase().includes(q) || (s.name||'').toLowerCase().includes(q));
+      if(filtered.length===0){ sel.innerHTML = '<option value="">-- ไม่พบสินค้า --</option>'; }
+      else { sel.innerHTML = '<option value="">-- เลือกสินค้า --</option>' + filtered.map(s=>`<option value="${s.code}">${s.name} — ${s.code} (คงเหลือ ${s.quantity})</option>`).join(''); }
+    }
+    function readFileAsDataURL(file){
+    return new Promise((resolve)=>{
+    if(!file){ resolve(''); return; }
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result || '');
+    reader.readAsDataURL(file);
+    });
+    }
+
+    // helper to choose between raw read vs resize
+    async function processImageFile(file, mode){
+    if(!file) return '';
+    // set per-mode ceilings (client-side)
+    // SPR uses existing stock image: no upload field
+    const common = { maxW: 1024, maxH: 1024, maxKB: 300 };
+    if(mode === 'PR'){
+    return await readAndResizeImage(file, common);
+    }
+    if(mode === 'STOCK'){
+    return await readAndResizeImage(file, common);
+    }
+    return await readAndResizeImage(file, common);
+    }
+
+    // Resize/compress image on client safely
+    async function readAndResizeImage(file, opts={}){
+    if(!file) return '';
+    const {
+    maxW = 1024,
+    maxH = 1024,
+    maxKB = 300,
+    outputType = 'image/jpeg',
+    qualityStart = 0.8,
+    qualityMin = 0.5
+    } = opts;
+    function approxKB(dataUrl){
+    // strip header like data:image/jpeg;base64,
+    const base64 = (dataUrl.split(',')[1]||'');
+    // 4/3 for base64 -> bytes
+    return Math.ceil((base64.length * 3 / 4) / 1024);
+    }
+    return await new Promise((resolve)=>{
+    const reader = new FileReader();
+    reader.onload = (e)=>{
+    const img = new Image();
+    img.onload = ()=>{
+    let w = img.naturalWidth || img.width;
+    let h = img.naturalHeight || img.height;
+    const ratio = Math.min(maxW / w, maxH / h, 1);
+    const cw = Math.max(1, Math.round(w * ratio));
+    const ch = Math.max(1, Math.round(h * ratio));
+    const canvas = document.createElement('canvas');
+    canvas.width = cw; canvas.height = ch;
+    const ctx = canvas.getContext('2d');
+    // improve quality a bit
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, 0, 0, cw, ch);
+    let q = qualityStart;
+    let out = canvas.toDataURL(outputType, q);
+    // reduce quality progressively until under maxKB or hit min
+    while(approxKB(out) > maxKB && q > qualityMin){
+    q = Math.max(qualityMin, q - 0.1);
+    out = canvas.toDataURL(outputType, q);
+    }
+    if(approxKB(out) > maxKB){
+    alert(`ไฟล์รูปยังมีขนาดเกิน ${maxKB}KB หลังย่อแล้ว กรุณาเลือกรูปที่เล็กลง`);
+    resolve('');
+    } else {
+    resolve(out);
+    }
+    };
+    img.onerror = ()=> resolve('');
+    img.src = e.target.result;
+    };
+    reader.onerror = ()=> resolve('');
+    reader.readAsDataURL(file);
+    });
+    }
+
+
+    // ---- Mode Switching ----
+    document.getElementById('modeSelector').addEventListener('click', (e)=>{
+    const btn = e.target.closest('.mode-btn');
+    if(!btn) return;
+    const targetSel = btn.getAttribute('data-target');
+    document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.mode-content').forEach(sec=>sec.classList.remove('active'));
+    const sec = document.querySelector(targetSel);
+    if(sec){ sec.classList.add('active'); }
+    });
+
+    // Subtabs
+    document.getElementById('sprSubtabs').addEventListener('click', (e)=>{
+    const btn = e.target.closest('.subtab-btn'); if(!btn) return;
+    const targetSel = btn.getAttribute('data-target');
+    document.querySelectorAll('#spr-mode .subtab-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('#spr-mode .subtab-content').forEach(sec=>sec.classList.remove('active'));
+    const sec = document.querySelector(targetSel); if(sec){ sec.classList.add('active'); }
+    });
+    document.getElementById('prSubtabs').addEventListener('click', (e)=>{
+    const btn = e.target.closest('.subtab-btn'); if(!btn) return;
+    const targetSel = btn.getAttribute('data-target');
+    document.querySelectorAll('#pr-mode .subtab-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('#pr-mode .subtab-content').forEach(sec=>sec.classList.remove('active'));
+    const sec = document.querySelector(targetSel); if(sec){ sec.classList.add('active'); }
+    });
+    document.getElementById('stockSubtabs').addEventListener('click', (e)=>{
+    const btn = e.target.closest('.subtab-btn'); if(!btn) return;
+    const targetSel = btn.getAttribute('data-target');
+    document.querySelectorAll('#stock-mode .subtab-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('#stock-mode .subtab-content').forEach(sec=>sec.classList.remove('active'));
+    const sec = document.querySelector(targetSel); if(sec){ sec.classList.add('active'); }
+    });
+
+    // ---- SPR Actions ----
+    document.getElementById('spr-add').addEventListener('click', ()=>{
+    const code = document.getElementById('spr-product-select').value;
+    const qty = parseInt(document.getElementById('spr-quantity').value)||1;
+    const req = (document.getElementById('spr-requester').value||'').trim()||'ไม่ระบุ';
+    if(!code) return alert('กรุณาเลือกสินค้า');
+    const item = stock.find(x=>x.code===code);
+    if(!item) return alert('ไม่พบสินค้าในคลัง');
+    if(item.quantity < qty) return alert('สต็อกไม่พอ');
+    spr.push({id:Date.now(),code:code,name:item.name,quantity:qty,requester:req,status:'pending',timestamp:new Date().toLocaleString('th-TH'), imageData:item.imageData||''});
+    persist(); renderSPR();
+    document.getElementById('spr-quantity').value = 1; document.getElementById('spr-requester').value = '';
+    });
+
+    // ---- PR Actions ----
+    document.getElementById('pr-add').addEventListener('click', async ()=>{
+    const code = (document.getElementById('pr-code').value||'').trim();
+    let name = (document.getElementById('pr-name').value||'').trim();
+    const qty = parseInt(document.getElementById('pr-qty').value)||1;
+    const requester = (document.getElementById('pr-requester').value||'').trim()||'ไม่ระบุ';
+    const job = (document.getElementById('pr-job').value||'').trim()||'ไม่ระบุ';
+    const remark = (document.getElementById('pr-remark').value||'').trim()||'-';
+    const file = document.getElementById('pr-image').files[0] || null;
+    if(!code) return alert('กรุณาระบุรหัสสินค้า');
+    if(!name){ const found = stock.find(x=>x.code===code); name = found ? found.name : code; }
+    const imageData = await processImageFile(file, 'PR');
+    pr.push({id:Date.now(),code,name,quantity:qty,requester,job,remark,status:'pending',timestamp:new Date().toLocaleString('th-TH'), imageData});
+    persist(); renderPR();
+    document.getElementById('pr-code').value=''; document.getElementById('pr-name').value='';
+    document.getElementById('pr-qty').value=1; document.getElementById('pr-image').value='';
+    });
+
+    // ---- Stock Actions (Admin) ----
+    document.getElementById('st-add').addEventListener('click', async ()=>{
+    if(!isStockAdmin) return alert('ต้องเข้าสู่ระบบ Admin (admin1 หรือ admin2) เท่านั้น');
+    const code = (document.getElementById('st-code').value||'').trim();
+    const name = (document.getElementById('st-name').value||'').trim();
+    const qty = parseInt((document.getElementById('st-qty').value||'1').replace('+',''))||1;
+    const price = parseFloat(document.getElementById('st-price').value)||0;
+    const minQty = Math.max(0, parseInt(document.getElementById('st-min').value||'0'));
+    const file = document.getElementById('st-image').files[0] || null;
+    if(!code) return alert('กรุณาระบุรหัสสินค้า'); if(!name) return alert('กรุณาระบุชื่อสินค้า');
+    const imageData = await readFileAsDataURL(file);
+    const ex = stock.find(x=>x.code===code);
+    if(ex){
+    ex.quantity += qty; if(price>0) ex.price = price; if(name) ex.name = name; ex.minQty = isNaN(minQty)?0:minQty; if(imageData) ex.imageData = imageData; ex.lastUpdate=new Date().toLocaleString('th-TH');
+    logStockHistory('เพิ่ม', code, ex.name, `+${qty}`);
+    } else {
+    stock.push({code,name,price,quantity:qty,minQty:isNaN(minQty)?0:minQty,lastUpdate:new Date().toLocaleString('th-TH'), imageData});
+    logStockHistory('เพิ่ม', code, name, `+${qty}`);
+    }
+    persist(); renderStock(); renderHistory(); fillSPRSelect();
+    document.getElementById('st-code').value=''; document.getElementById('st-name').value='';
+    document.getElementById('st-qty').value='1'; document.getElementById('st-price').value='';
+    document.getElementById('st-min').value=''; document.getElementById('st-image').value='';
+    });
+
+    document.getElementById('st-update').addEventListener('click', ()=>{
+    if(!isStockAdmin) return alert('ต้องเข้าสู่ระบบ Admin (admin1 หรือ admin2) เท่านั้น');
+    const code = (document.getElementById('st-code').value||'').trim();
+    const nameInput = (document.getElementById('st-name').value||'').trim();
+    const qtyRaw = (document.getElementById('st-qty').value||'').trim();
+    const price = parseFloat(document.getElementById('st-price').value)||0;
+    const minQtyInput = document.getElementById('st-min').value;
+    const minQtyParsed = minQtyInput === '' ? null : Math.max(0, parseInt(minQtyInput));
+    if(!code) return alert('กรุณาระบุรหัสสินค้า');
+    const ex = stock.find(x=>x.code===code); if(!ex) return alert('ไม่พบสินค้าในคลัง');
+    if(nameInput) ex.name = nameInput; if(price>0) ex.price = price; if(minQtyParsed !== null && !isNaN(minQtyParsed)) ex.minQty = minQtyParsed;
+    let newQty = ex.quantity;
+    if(/^[-+]/.test(qtyRaw)){
+    const delta = parseInt(qtyRaw, 10); if(isNaN(delta)) return alert('รูปแบบจำนวนไม่ถูกต้อง');
+    newQty = ex.quantity + delta; if(delta>0) logStockHistory('เพิ่ม', code, ex.name, `+${delta}`); else if(delta<0) logStockHistory('เบิก/ลด', code, ex.name, `${delta}`);
+    } else if(qtyRaw !== '') {
+    const setVal = parseInt(qtyRaw, 10); if(isNaN(setVal)) return alert('รูปแบบจำนวนไม่ถูกต้อง');
+    const delta = setVal - ex.quantity; newQty = setVal; if(delta!==0){ if(delta>0) logStockHistory('เพิ่ม', code, ex.name, `+${delta}`); else logStockHistory('เบิก/ลด', code, ex.name, `${delta}`); }
+    }
+    if(newQty < 0) newQty = 0; ex.quantity = newQty; ex.lastUpdate = new Date().toLocaleString('th-TH');
+    persist(); renderStock(); renderHistory(); fillSPRSelect();
+    });
+
+    document.getElementById('st-clear').addEventListener('click', ()=>{
+    if(!isStockAdmin) return alert('ต้องเข้าสู่ระบบ Admin (admin1 หรือ admin2) เท่านั้น');
+    if(!confirm('ล้างข้อมูลคลังทั้งหมด?')) return; stock.forEach(it=>logStockHistory('ลบสินค้า', it.code, it.name, `-${it.quantity}`)); stock = []; persist(); renderStock(); renderHistory(); fillSPRSelect();
+    });
+
+    // ---- Export/Import ----
+    function downloadCSV(csv, filename){
+    const blob = new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download=filename; a.click(); URL.revokeObjectURL(url);
+    }
+    function pickFile(cb){
+    const input = document.createElement('input'); input.type='file'; input.accept='.csv,text/csv';
+    input.onchange = ()=>{ const file = input.files[0]; if(!file) return; const reader = new FileReader(); reader.onload = (e)=> cb(e.target.result); reader.readAsText(file, 'utf-8'); };
+    input.click();
+    }
+    // Enhanced CSV parser that handles quoted fields
+    function parseCSV(text) {
+    const lines = text.trim().split(/\r?\n/);
+    const rows = [];
+    for (const line of lines) {
+    const cells = [];
+    let cell = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (char === '"' && !inQuotes) {
+    inQuotes = true;
+    } else if (char === '"' && inQuotes) {
+    if (i + 1 < line.length && line[i + 1] === '"') {
+    cell += '"';
+    i++;
+    } else {
+    inQuotes = false;
+    }
+    } else if (char === ',' && !inQuotes) {
+    cells.push(cell);
+    cell = '';
+    } else {
+    cell += char;
+    }
+    }
+    cells.push(cell);
+    rows.push(cells);
+    }
+    return rows;
+    }
+
+    // Flexible header validation that checks for required columns without strict ordering
+    function validateHeader(header, need) {
+    if (!header) return false;
+    const h = header.map(x => x.trim().toLowerCase());
+    return need.every(n => h.includes(n));
+    }
+
+    // SPR Export/Import
+    document.getElementById('spr-export-cart').addEventListener('click', ()=>{
+    if(spr.length===0) return alert('ไม่มีข้อมูล SPR Cart');
+    let csv = 'id,code,name,quantity,requester,status,timestamp,imageData\n'; spr.forEach(s=>{ const img=(s.imageData||'').replace(/,/g,';'); csv += `${s.id},${s.code},${s.name},${s.quantity},${s.requester},${s.status},${s.timestamp},${img}\n`; }); downloadCSV(csv, 'SPR_Cart.csv');
+    });
+    document.getElementById('spr-import-cart').addEventListener('click', ()=>{
+    pickFile((text)=>{
+    const rows = parseCSV(text); const header = rows.shift(); const need = ['id','code','name','quantity','requester','status','timestamp','imageData'];
+    if(!validateHeader(header, need)) return alert('คอลัมน์ไม่ถูกต้อง ต้องมี: id,code,name,quantity,requester,status,timestamp,imageData');
+    
+    // Create a mapping of header names to their indices
+    const headerMap = {};
+    header.forEach((h, index) => {
+    headerMap[h.trim().toLowerCase()] = index;
+    });
+
+    const imported = rows.map(r=>{
+    // Use headerMap to get values by column name
+    return {
+    id: parseInt(r[headerMap['id']]) || Date.now(),
+    code: r[headerMap['code']],
+    name: r[headerMap['name']],
+    quantity: parseInt(r[headerMap['quantity']]) || 1,
+    requester: r[headerMap['requester']] || 'ไม่ระบุ',
+    status: r[headerMap['status']] || 'pending',
+    timestamp: r[headerMap['timestamp']] || new Date().toLocaleString('th-TH'),
+    imageData: r[headerMap['imagedata']] || ''
+    };
+    }).filter(x=>x.code);
+    spr = imported; persist(); renderSPR(); alert(`นำเข้า SPR Cart สำเร็จ ${imported.length} รายการ`);
+    });
+    });
+    document.getElementById('spr-export-history').addEventListener('click', ()=>{
+    if(sprHistory.length===0) return alert('ไม่มีประวัติ SPR');
+    let csv = 'id,code,name,quantity,requester,status,timestamp,imageData\n'; sprHistory.forEach(s=>{ const img=(s.imageData||'').replace(/,/g,';'); csv += `${s.id},${s.code},${s.name},${s.quantity},${s.requester},${s.status||'done'},${s.timestamp},${img}\n`; }); downloadCSV(csv, 'SPR_History.csv');
+    });
+    document.getElementById('spr-import-history').addEventListener('click', ()=>{
+    pickFile((text)=>{
+    const rows = parseCSV(text); const header = rows.shift(); const need = ['id','code','name','quantity','requester','status','timestamp','imageData'];
+    if(!validateHeader(header, need)) return alert('คอลัมน์ไม่ถูกต้อง ต้องมี: id,code,name,quantity,requester,status,timestamp,imageData');
+    
+    // Create a mapping of header names to their indices
+    const headerMap = {};
+    header.forEach((h, index) => {
+    headerMap[h.trim().toLowerCase()] = index;
+    });
+
+    const imported = rows.map(r=>{
+    // Use headerMap to get values by column name
+    return {
+    id: parseInt(r[headerMap['id']]) || Date.now(),
+    code: r[headerMap['code']],
+    name: r[headerMap['name']],
+    quantity: parseInt(r[headerMap['quantity']]) || 1,
+    requester: r[headerMap['requester']] || 'ไม่ระบุ',
+    status: r[headerMap['status']] || 'done',
+    timestamp: r[headerMap['timestamp']] || new Date().toLocaleString('th-TH'),
+    imageData: r[headerMap['imagedata']] || ''
+    };
+    }).filter(x=>x.code);
+    sprHistory = imported; persist(); renderSPRHistory(); alert(`นำเข้า SPR History สำเร็จ ${imported.length} รายการ`);
+    });
+    });
+
+    // PR Export/Import
+    document.getElementById('pr-export-cart').addEventListener('click', ()=>{
+    if(pr.length===0) return alert('ไม่มีข้อมูล PR Cart');
+    let csv = 'id,code,name,quantity,requester,job,remark,status,timestamp,imageData\n'; pr.forEach(p=>{ const img=(p.imageData||'').replace(/,/g,';'); csv += `${p.id},${p.code},${p.name},${p.quantity},${p.requester},${p.job},${p.remark},${p.status},${p.timestamp},${img}\n`; }); downloadCSV(csv, 'PR_Cart.csv');
+    });
+    document.getElementById('pr-import-cart').addEventListener('click', ()=>{
+    pickFile((text)=>{
+    const rows = parseCSV(text); const header = rows.shift(); const need = ['id','code','name','quantity','requester','job','remark','status','timestamp','imageData'];
+    if(!validateHeader(header, need)) return alert('คอลัมน์ไม่ถูกต้อง ต้องมี: id,code,name,quantity,requester,job,remark,status,timestamp,imageData');
+    
+    // Create a mapping of header names to their indices
+    const headerMap = {};
+    header.forEach((h, index) => {
+    headerMap[h.trim().toLowerCase()] = index;
+    });
+
+    const imported = rows.map(r=>{
+    // Use headerMap to get values by column name
+    return {
+    id: parseInt(r[headerMap['id']]) || Date.now(),
+    code: r[headerMap['code']],
+    name: r[headerMap['name']],
+    quantity: parseInt(r[headerMap['quantity']]) || 1,
+    requester: r[headerMap['requester']] || 'ไม่ระบุ',
+    job: r[headerMap['job']] || 'ไม่ระบุ',
+    remark: r[headerMap['remark']] || '-',
+    status: r[headerMap['status']] || 'pending',
+    timestamp: r[headerMap['timestamp']] || new Date().toLocaleString('th-TH'),
+    imageData: r[headerMap['imagedata']] || ''
+    };
+    }).filter(x=>x.code);
+    pr = imported; persist(); renderPR(); alert(`นำเข้า PR Cart สำเร็จ ${imported.length} รายการ`);
+    });
+    });
+    document.getElementById('pr-export-history').addEventListener('click', ()=>{
+    if(prHistory.length===0) return alert('ไม่มีประวัติ PR');
+    let csv = 'id,code,name,quantity,requester,status,timestamp,imageData\n'; prHistory.forEach(p=>{ const img=(p.imageData||'').replace(/,/g,';'); csv += `${p.id},${p.code},${p.name},${p.quantity},${p.requester},${p.status||'done'},${p.timestamp},${img}\n`; }); downloadCSV(csv, 'PR_History.csv');
+    });
+    document.getElementById('pr-import-history').addEventListener('click', ()=>{
+    pickFile((text)=>{
+    const rows = parseCSV(text); const header = rows.shift(); const need = ['id','code','name','quantity','requester','status','timestamp','imageData'];
+    if(!validateHeader(header, need)) return alert('คอลัมน์ไม่ถูกต้อง ต้องมี: id,code,name,quantity,requester,status,timestamp,imageData');
+    
+    // Create a mapping of header names to their indices
+    const headerMap = {};
+    header.forEach((h, index) => {
+    headerMap[h.trim().toLowerCase()] = index;
+    });
+
+    const imported = rows.map(r=>{
+    // Use headerMap to get values by column name
+    return {
+    id: parseInt(r[headerMap['id']]) || Date.now(),
+    code: r[headerMap['code']],
+    name: r[headerMap['name']],
+    quantity: parseInt(r[headerMap['quantity']]) || 1,
+    requester: r[headerMap['requester']] || 'ไม่ระบุ',
+    status: r[headerMap['status']] || 'done',
+    timestamp: r[headerMap['timestamp']] || new Date().toLocaleString('th-TH'),
+    imageData: r[headerMap['imagedata']] || ''
+    };
+    }).filter(x=>x.code);
+    prHistory = imported; persist(); renderPRHistory(); alert(`นำเข้า PR History สำเร็จ ${imported.length} รายการ`);
+
+    // Ensure SPR/PR/Stock Import/Export buttons exist and are bound in all modes
+    // (No-op section for completeness)
+
+    });
+    });
+
+
+    // Stock Export/Import
+    document.getElementById('st-export').addEventListener('click', ()=>{
+    if(stock.length===0) return alert('ไม่มีข้อมูลสต็อก');
+    let csv = 'code,name,price,quantity,minQty,lastUpdate,imageData\n';
+    stock.forEach(s=>{
+    const imageField = (s.imageData||'').replace(/,/g,';');
+    const nameField = (s.name||'').replace(/,/g,' ');
+    csv += `${s.code},${nameField},${s.price||0},${s.quantity||0},${s.minQty||0},${s.lastUpdate||''},${imageField}\n`;
+    });
+    downloadCSV(csv,'Stock.csv');
+    });
+
+    document.getElementById('st-import').addEventListener('click', ()=>{
+    pickFile((text)=>{
+    const rows = parseCSV(text);
+    const header = rows.shift();
+    const need = ['code','name','price','quantity','minqty','lastupdate','imagedata'];
+    if(!validateHeader(header, need)) return alert('คอลัมน์ไม่ถูกต้อง ต้องมี: code,name,price,quantity,minQty,lastUpdate,imageData');
+    
+    // Create a mapping of header names to their indices
+    const headerMap = {};
+    header.forEach((h, index) => {
+    headerMap[h.trim().toLowerCase()] = index;
+    });
+
+    const imported = rows
+    .map(r=>{
+    // Use headerMap to get values by column name
+    return {
+    code: r[headerMap['code']],
+    name: r[headerMap['name']] || r[headerMap['code']],
+    price: parseFloat(r[headerMap['price']]) || 0,
+    quantity: parseInt(r[headerMap['quantity']]) || 0,
+    minQty: parseInt(r[headerMap['minqty']]) || 0,
+    lastUpdate: r[headerMap['lastupdate']] || new Date().toLocaleString('th-TH'),
+    imageData: r[headerMap['imagedata']] || ''
+    };
+    })
+    .filter(x=>x.code);
+    
+    // Enhanced import logic: merge with existing stock instead of replacing
+    let newItems = 0;
+    let updatedItems = 0;
+    
+    imported.forEach(importItem => {
+    const existingItem = stock.find(s => s.code === importItem.code);
+    if (existingItem) {
+    // Update existing item: add quantity and update other fields if provided
+    existingItem.quantity += importItem.quantity;
+    if (importItem.name && importItem.name !== importItem.code) existingItem.name = importItem.name;
+    if (importItem.price > 0) existingItem.price = importItem.price;
+    if (importItem.minQty >= 0) existingItem.minQty = importItem.minQty;
+    if (importItem.imageData) existingItem.imageData = importItem.imageData;
+    existingItem.lastUpdate = new Date().toLocaleString('th-TH');
+    
+    // Log history for quantity addition
+    logStockHistory('นำเข้า/เพิ่ม', importItem.code, existingItem.name, `+${importItem.quantity}`);
+    updatedItems++;
+    } else {
+    // Add new item to stock
+    stock.push(importItem);
+    logStockHistory('นำเข้า/ใหม่', importItem.code, importItem.name, `+${importItem.quantity}`);
+    newItems++;
+    }
+    });
+    
+    persist(); renderStock(); renderHistory(); fillSPRSelect();
+    alert(`นำเข้าสต็อกสำเร็จ\n- สินค้าใหม่: ${newItems} รายการ\n- สินค้าที่อัปเดต: ${updatedItems} รายการ`);
+    });
+    });
+
+    // History Export/Clear
+    document.getElementById('his-export').addEventListener('click', ()=>{
+    if(stockHistory.length===0) return alert('ไม่มีประวัติ');
+    const data = [...stockHistory].reverse(); let csv = 'time,code,name,change,type,admin\n'; data.forEach(h=>{ csv += `${h.time},${h.code},${h.name},${h.change},${h.type},${h.admin||''}\n`; }); downloadCSV(csv, 'Stock_History.csv');
+    });
+    document.getElementById('his-clear').addEventListener('click', ()=>{
+    if(!isStockAdmin) return alert('ต้องเข้าสู่ระบบ Admin (admin1 หรือ admin2) เท่านั้น');
+    if(!confirm('ล้างประวัติทั้งหมด?')) return; stockHistory = []; persist(); renderHistory();
+    });
+
+    // ---- Admin Auth ----
+    // PR
+    document.getElementById('btn-pr-admin-login').addEventListener('click', ()=>{
+    const pass = prompt('กรอกรหัสผ่าน Admin (PR):');
+    if(pass===localStorage.getItem('prAdminPass')){ isPRAdmin = true; sessionStorage.setItem('isPRAdmin','true'); updateAdminUI(); renderPR(); alert('เข้าสู่ระบบ Admin PR แล้ว'); }
+    else { alert('รหัสผ่านไม่ถูกต้อง'); }
+    });
+    document.getElementById('btn-pr-admin-logout').addEventListener('click', ()=>{
+    if(!isPRAdmin){ alert('ยังไม่ได้เข้าสู่ระบบ Admin PR'); return; }
+    if(!confirm('ยืนยันออกจากระบบ Admin PR?')) return; isPRAdmin=false; sessionStorage.removeItem('isPRAdmin'); updateAdminUI(); renderPR();
+    });
+    document.getElementById('btn-pr-change-pass').addEventListener('click', ()=>{
+    if(!isPRAdmin) return; const cur = prompt('ใส่รหัสปัจจุบัน (PR):'); if(cur!==localStorage.getItem('prAdminPass')) return alert('รหัสปัจจุบันไม่ถูกต้อง'); const np = prompt('ใส่รหัสใหม่ (PR):'); if(!np) return; const np2 = prompt('ใส่รหัสใหม่อีกครั้ง (PR):'); if(np!==np2) return alert('รหัสใหม่ไม่ตรงกัน'); localStorage.setItem('prAdminPass', np); alert('เปลี่ยนรหัส PR Admin สำเร็จ');
+    });
+
+    // SPR
+    document.getElementById('btn-spr-admin-login').addEventListener('click', ()=>{
+    const pass = prompt('กรอกรหัสผ่าน Admin (SPR):');
+    if(pass===localStorage.getItem('sprAdminPass')){ isSPRAdmin = true; sessionStorage.setItem('isSPRAdmin','true'); updateAdminUI(); renderSPR(); alert('เข้าสู่ระบบ Admin SPR แล้ว'); }
+    else { alert('รหัสผ่านไม่ถูกต้อง'); }
+    });
+    document.getElementById('btn-spr-admin-logout').addEventListener('click', ()=>{
+    if(!isSPRAdmin){ alert('ยังไม่ได้เข้าสู่ระบบ Admin SPR'); return; }
+    if(!confirm('ยืนยันออกจากระบบ Admin SPR?')) return; isSPRAdmin=false; sessionStorage.removeItem('isSPRAdmin'); updateAdminUI(); renderSPR();
+    });
+    document.getElementById('btn-spr-change-pass').addEventListener('click', ()=>{
+    if(!isSPRAdmin) return; const cur = prompt('ใส่รหัสปัจจุบัน (SPR):'); if(cur!==localStorage.getItem('sprAdminPass')) return alert('รหัสปัจจุบันไม่ถูกต้อง'); const np = prompt('ใส่รหัสใหม่ (SPR):'); if(!np) return; const np2 = prompt('ใส่รหัสใหม่อีกครั้ง (SPR):'); if(np!==np2) return alert('รหัสใหม่ไม่ตรงกัน'); localStorage.setItem('sprAdminPass', np); alert('เปลี่ยนรหัส SPR Admin สำเร็จ');
+    });
+
+    // Stock (Dual)
+    document.getElementById('btn-stock-admin-login').addEventListener('click', ()=>{
+    const pass = prompt('กรอกรหัสผ่าน Admin (Stock):');
+    if(pass===localStorage.getItem('stockAdmin1Pass')){ isStockAdmin = true; stockAdminUser='admin1'; }
+    else if(pass===localStorage.getItem('stockAdmin2Pass')){ isStockAdmin = true; stockAdminUser='admin2'; }
+    else { return alert('รหัสผ่านไม่ถูกต้อง'); }
+    sessionStorage.setItem('isStockAdmin','true'); sessionStorage.setItem('stockAdminUser', stockAdminUser); updateAdminUI(); updateStockButtons(); alert('เข้าสู่ระบบ Admin Stock แล้ว ('+stockAdminUser+')');
+    });
+    document.getElementById('btn-stock-admin-logout').addEventListener('click', ()=>{
+    if(!isStockAdmin){ alert('ยังไม่ได้เข้าสู่ระบบ Admin Stock'); return; }
+    if(!confirm('ยืนยันออกจากระบบ Admin Stock?')) return; isStockAdmin=false; stockAdminUser=null; sessionStorage.removeItem('isStockAdmin'); sessionStorage.removeItem('stockAdminUser'); updateAdminUI(); updateStockButtons();
+    });
+    document.getElementById('btn-stock-change-pass').addEventListener('click', ()=>{
+    if(!isStockAdmin) return; const key = stockAdminUser === 'admin2' ? 'stockAdmin2Pass' : 'stockAdmin1Pass'; const cur = prompt(`ใส่รหัสปัจจุบัน (${stockAdminUser}):`); if(cur!==localStorage.getItem(key)) return alert('รหัสปัจจุบันไม่ถูกต้อง'); const np = prompt('ใส่รหัสใหม่:'); if(!np) return; const np2 = prompt('ใส่รหัสใหม่อีกครั้ง:'); if(np!==np2) return alert('รหัสใหม่ไม่ตรงกัน'); localStorage.setItem(key, np); alert(`เปลี่ยนรหัส ${stockAdminUser} สำเร็จ`);
+    });
+
+    function updateAdminUI(){
+    const prState = document.getElementById('pr-admin-state');
+    const sprState = document.getElementById('spr-admin-state');
+    const stState = document.getElementById('stock-admin-state');
+    if(prState) prState.textContent = isPRAdmin ? 'สถานะ PR: Admin' : 'สถานะ PR: ผู้ใช้ทั่วไป';
+    if(sprState) sprState.textContent = isSPRAdmin ? 'สถานะ SPR: Admin' : 'สถานะ SPR: ผู้ใช้ทั่วไป';
+    if(stState) stState.textContent = isStockAdmin ? ('สถานะ Stock: Admin ('+(stockAdminUser||'-')+')') : 'สถานะ Stock: ผู้ใช้ทั่วไป';
+    const b1 = document.getElementById('btn-pr-change-pass');
+    const b2 = document.getElementById('btn-spr-change-pass');
+    const b3 = document.getElementById('btn-stock-change-pass');
+    if(b1) b1.disabled = !isPRAdmin; if(b2) b2.disabled = !isSPRAdmin; if(b3) b3.disabled = !isStockAdmin;
+    }
+    function updateStockButtons(){
+    const b1 = document.getElementById('st-add'); const b2 = document.getElementById('st-update'); const b3 = document.getElementById('st-clear'); const b4 = document.getElementById('his-clear');
+    if(b1) b1.disabled = !isStockAdmin; if(b2) b2.disabled = !isStockAdmin; if(b3) b3.disabled = !isStockAdmin; if(b4) b4.disabled = !isStockAdmin;
+    }
+
+    // ---- Renders ----
+    function enlargeImage(src){ const m = document.getElementById('imgModal'); const img = document.getElementById('imgModalPic'); if(!m||!img) return; img.src = src; m.style.display='flex'; }
+    window.enlargeImage = enlargeImage;
+
+    function renderSPR(){
+    const body = document.getElementById('spr-body'); if(!body) return;
+    if(spr.length===0){ body.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#777">ยังไม่มีรายการ</td></tr>'; }
+    else { body.innerHTML = spr.map((r,i)=>{
+    const badge = r.status==='done' ? `<span class='status-badge status-done'>เรียบร้อยแล้ว</span>` : `<span class='status-badge status-pending'>กำลังเบิกออก</span>`;
+    return `<tr>
+    <td>${i+1}</td>
+    <td>${r.imageData ? `<img class='thumb' src='${r.imageData}' onclick=\"enlargeImage('${r.imageData}')\"/>` : '-'}</td>
+    <td>${r.code}</td><td>${r.name}</td><td>${r.quantity}</td><td>${r.requester}</td>
+    <td>${badge}</td><td>${r.timestamp}</td>
+    <td>
+    <button class='btn gray' style='padding:6px 10px;font-size:12px' onclick='adminToggleSPRStatus(${r.id})' ${isSPRAdmin?'':'disabled'}>เปลี่ยนสถานะ</button>
+    <button class='btn danger' style='padding:6px 10px;font-size:12px' onclick='adminDelSPR(${r.id})' ${isSPRAdmin?'':'disabled'}>ลบ</button>
+    </td>
+    </tr>`
+    }).join(''); }
+    }
+    function renderSPRHistory(){
+    const body = document.getElementById('spr-history-body'); if(!body) return;
+    const pager = ensurePager('#spr-history .table-container', 'spr-history-pager');
+    if(sprHistory.length===0){ body.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#777">ยังไม่มีประวัติ SPR</td></tr>'; if(pager) pager.innerHTML=''; return; }
+    const totalPages = Math.max(1, Math.ceil(sprHistory.length / PAGE_SIZE));
+    sprHistPage = clampPage(sprHistPage, totalPages);
+    const start = (sprHistPage-1)*PAGE_SIZE;
+    const pageItems = sprHistory.slice(start, start+PAGE_SIZE);
+    body.innerHTML = pageItems.map((r,i)=>`<tr>
+    <td>${start + i + 1}</td><td>${r.imageData ? `<img class='thumb' src='${r.imageData}' onclick=\"enlargeImage('${r.imageData}')\"/>` : '-'}</td><td>${r.timestamp}</td><td>${r.requester}</td><td>${r.code}</td><td>${r.name}</td><td>${r.quantity}</td><td>${r.status||'done'}</td>
+    <td>${isSPRAdmin ? `<button class="btn danger" style="padding:6px 10px;font-size:12px" onclick="deleteSPRHistoryItem(${r.id})">ลบ</button>` : '-'}</td>
+    </tr>`).join('');
+    renderPager(pager, sprHistPage, totalPages, 'sprPrevPage', 'sprNextPage');
+    }
+
+    function renderPR(){
+    const body = document.getElementById('pr-body'); if(!body) return;
+    if(pr.length===0){ body.innerHTML = '<tr><td colspan="11" style="text-align:center;color:#777">ยังไม่มีรายการ</td></tr>'; }
+    else { body.innerHTML = pr.map((r,i)=>`<tr>
+    <td>${i+1}</td>
+    <td>${r.imageData ? `<img class='thumb' src='${r.imageData}' onclick=\"enlargeImage('${r.imageData}')\"/>` : '-'}</td>
+    <td>${r.code}</td><td>${r.name}</td><td>${r.quantity}</td><td>${r.requester}</td>
+    <td>${r.job}</td><td>${r.remark}</td><td>${r.timestamp}</td>
+    <td>${prStatusBadge(r.status)}</td>
+    <td>
+    <button class='btn light' style='padding:6px 10px;font-size:12px' onclick='adminChangePRStatus(${r.id})' ${isPRAdmin?'':'disabled'}>เปลี่ยนสถานะ</button>
+    <button class='btn danger' style='padding:6px 10px;font-size:12px' onclick='adminDeletePR(${r.id})' ${isPRAdmin?'':'disabled'}>ลบ</button>
+    </td>
+    </tr>`).join(''); }
+    }
+    function renderPRHistory(){
+    const body = document.getElementById('pr-history-body'); if(!body) return;
+    const pager = ensurePager('#pr-history .table-container', 'pr-history-pager');
+    if(prHistory.length===0){ body.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#777">ยังไม่มีประวัติ PR</td></tr>'; if(pager) pager.innerHTML=''; return; }
+    const totalPages = Math.max(1, Math.ceil(prHistory.length / PAGE_SIZE));
+    prHistPage = clampPage(prHistPage, totalPages);
+    const start = (prHistPage-1)*PAGE_SIZE;
+    const pageItems = prHistory.slice(start, start+PAGE_SIZE);
+    body.innerHTML = pageItems.map((r,i)=>`<tr>
+    <td>${start + i + 1}</td>
+    <td>${r.imageData ? `<img class='thumb' src='${r.imageData}' onclick=\"enlargeImage('${r.imageData}')\"/>` : '-'}</td>
+    <td>${r.timestamp}</td>
+    <td>${r.requester}</td>
+    <td>${r.code}</td>
+    <td>${r.name}</td>
+    <td>${r.quantity}</td>
+    <td>
+    ${isPRAdmin ? `
+    <select onchange="changePRHistoryStatus(${r.id}, this.value)">
+    <option value="approved" ${r.status === 'approved' ? 'selected' : ''}>อนุมัติ</option>
+    <option value="ordered" ${r.status === 'ordered' ? 'selected' : ''}>สั่งซื้อแล้ว</option>
+    </select>
+    ` : prStatusBadge(r.status)}
+    </td>
+    <td>
+    ${isPRAdmin ? `<button class="btn danger" style="padding:6px 10px;font-size:12px" onclick="deletePRHistoryItem(${r.id})">ลบ</button>` : '-'}
+    </td>
+  </tr>`).join('');
+    renderPager(pager, prHistPage, totalPages, 'prPrevPage', 'prNextPage');
+    }
+
+    function renderStock(){
+    const body = document.getElementById('st-body'); if(!body) return;
+    if(stock.length===0){ body.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#777">ยังไม่มีสินค้า</td></tr>'; }
+    else {
+    const sorted = getStockSorted();
+    body.innerHTML = sorted.map((s)=>{
+    const st = statusObj(s);
+    return `<tr>
+    <td>${s.code}</td>
+    <td>${s.imageData ? `<img class='thumb' src='${s.imageData}' onclick=\"enlargeImage('${s.imageData}')\"/>` : '-'}</td>
+    <td>${s.name}</td>
+    <td>${fmt(s.price)}</td>
+    <td>${fmt(s.quantity)}</td>
+    <td>${fmt(s.minQty)}</td>
+    <td><span class="status-badge ${st.cls}">${st.text}</span></td>
+    <td>${fmt((s.price||0)*(s.quantity||0))}</td>
+    <td>${s.lastUpdate||''}</td>
+    <td>
+    <button class='btn gray' style='padding:6px 10px;font-size:12px' onclick='fillToForm("${s.code}")' ${isStockAdmin?'':'disabled'}>ดึงไปแก้ไข</button>
+    </td>
+    </tr>`;
+    }).join('');
+    }
+    }
+    function renderHistory(){
+    const body = document.getElementById('his-body'); if(!body) return;
+    const pager = ensurePager('#stock-history .table-container', 'stock-history-pager');
+    if(stockHistory.length===0){ body.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#777">ยังไม่มีประวัติ</td></tr>'; if(pager) pager.innerHTML=''; return; }
+    const data = [...stockHistory].reverse();
+    const totalPages = Math.max(1, Math.ceil(data.length / PAGE_SIZE));
+    stockHistPage = clampPage(stockHistPage, totalPages);
+    const start = (stockHistPage-1)*PAGE_SIZE;
+    const pageItems = data.slice(start, start+PAGE_SIZE);
+    body.innerHTML = pageItems.map(h=>`<tr>
+    <td>${h.time}</td><td>${(stock.find(x=>x.code===h.code)?.imageData) ? `<img class='thumb' src='${stock.find(x=>x.code===h.code).imageData}' onclick=\"enlargeImage('${stock.find(x=>x.code===h.code).imageData}')\"/>` : '-'}</td><td>${h.code}</td><td>${h.name}</td><td>${h.change}</td><td>${h.type}</td><td>${h.admin||''}</td>
+    <td>${isStockAdmin ? `<button class="btn danger" style="padding:6px 10px;font-size:12px" onclick="deleteStockHistoryItem(${start + pageItems.indexOf(h)})">ลบ</button>` : '-'}</td>
+    </tr>`).join('');
+    renderPager(pager, stockHistPage, totalPages, 'stPrevPage', 'stNextPage');
+    }
+
+    function fillToForm(code){
+    const ex = stock.find(x=>x.code===code); if(!ex) return;
+    document.getElementById('st-code').value = ex.code;
+    document.getElementById('st-name').value = ex.name;
+    document.getElementById('st-price').value = ex.price || '';
+    document.getElementById('st-min').value = ex.minQty || 0;
+    document.getElementById('st-qty').focus();
+    }
+    window.fillToForm = fillToForm;
+
+    // ---- Inline Admin Ops ----
+    function adminToggleSPRStatus(id){ if(!isSPRAdmin) return alert('ต้องเป็น Admin SPR'); const idx = spr.findIndex(x=>x.id===id); if(idx<0) return; const r = spr[idx]; if(r.status==='pending'){ r.status='done'; sprHistory.push({...r}); spr.splice(idx,1); } else { r.status='pending'; } persist(); renderSPR(); renderSPRHistory(); }
+    function adminDelSPR(id){ if(!isSPRAdmin) return alert('ต้องเป็น Admin SPR'); const idx = spr.findIndex(x=>x.id===id); if(idx<0) return; if(!confirm('ยืนยันลบรายการ SPR นี้?')) return; spr.splice(idx,1); persist(); renderSPR(); }
+    function deleteSPRHistoryItem(id) {
+    if(!isSPRAdmin) return alert('ต้องเป็น Admin SPR');
+    const idx = sprHistory.findIndex(x=>x.id===id);
+    if(idx<0) return;
+    if(!confirm('ยืนยันลบรายการ SPR History นี้?')) return;
+    sprHistory.splice(idx,1);
+    persist();
+    renderSPRHistory();
+    }
+    window.adminToggleSPRStatus = adminToggleSPRStatus; window.adminDelSPR = adminDelSPR; window.deleteSPRHistoryItem = deleteSPRHistoryItem;
+
+    function adminChangePRStatus(id){
+    if(!isPRAdmin) return alert('ต้องเป็น Admin PR');
+    const idx = pr.findIndex(x=>x.id===id);
+    if(idx<0) return;
+    const r = pr[idx];
+    const flow = ['pending','approved'];
+    const i = flow.indexOf(r.status);
+    r.status = flow[(i+1)%flow.length];
+
+    // หากสถานะเป็น 'approved' ให้ย้ายไป History (PR)
+    if(r.status === 'approved'){
+    prHistory.push({
+    id: r.id,
+    code: r.code,
+    name: r.name,
+    quantity: r.quantity,
+    requester: r.requester || 'ไม่ระบุ',
+    status: r.status,
+    timestamp: new Date().toLocaleString('th-TH'),
+    imageData: r.imageData || ''
+    });
+    pr.splice(idx,1); // ย้ายออกจาก PR Cart
+    }
+
+    persist();
+    renderPR();
+    renderPRHistory();
+    }
+    function adminDeletePR(id){ if(!isPRAdmin) return alert('ต้องเป็น Admin PR'); const idx = pr.findIndex(x=>x.id===id); if(idx<0) return; if(!confirm('ยืนยันลบ PR นี้?')) return; pr.splice(idx,1); persist(); renderPR(); }
+    window.adminChangePRStatus = adminChangePRStatus; window.adminDeletePR = adminDeletePR;
+
+    // ---- Inline Admin Ops ----
+    function changePRHistoryStatus(id, newStatus) {
+    const item = prHistory.find(r => r.id === id);
+    if (item) {
+    item.status = newStatus;
+    persist();
+    renderPRHistory();
+    }
+    }
+    window.changePRHistoryStatus = changePRHistoryStatus;
+
+    function deletePRHistoryItem(id) {
+    if(!isPRAdmin) return alert('ต้องเป็น Admin PR');
+    const idx = prHistory.findIndex(x=>x.id===id);
+    if(idx<0) return;
+    if(!confirm('ยืนยันลบรายการ PR History นี้?')) return;
+    prHistory.splice(idx,1);
+    persist();
+    renderPRHistory();
+    }
+    window.deletePRHistoryItem = deletePRHistoryItem;
+
+    // Stock History Delete Function
+    function deleteStockHistoryItem(index) {
+    if(!isStockAdmin) return alert('ต้องเป็น Admin Stock');
+    if(!confirm('ยืนยันลบรายการ Stock History นี้?')) return;
+    const data = [...stockHistory].reverse();
+    const actualIndex = stockHistory.length - 1 - index;
+    stockHistory.splice(actualIndex, 1);
+    persist();
+    renderHistory();
+    }
+    window.deleteStockHistoryItem = deleteStockHistoryItem;
+
+    // ---- Barcode helper ----
+    document.getElementById('st-code').addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter'){
+    const code = e.target.value.trim(); if(!code) return; const item = stock.find(x=>x.code===code);
+    if(item){ document.getElementById('st-name').value = item.name || ''; document.getElementById('st-price').value = item.price || ''; document.getElementById('st-min').value = item.minQty || 0; document.getElementById('st-qty').focus(); }
+    }
+    });
+
+    // ---- Initial Render ----
+    function renderAll(){ fillSPRSelect(); renderSPR(); renderSPRHistory(); renderPR(); renderPRHistory(); renderStock(); renderHistory(); updateAdminUI(); updateStockButtons(); }
+    renderAll();
+
+    // Ensure search box is pre-populated with handler after initial render
+    const sprSearchInput = document.getElementById('spr-search');
+    if(sprSearchInput){
+      sprSearchInput.addEventListener('input', sprSearchHandler);
+    }
+  </script>
+</body>
+</html>
