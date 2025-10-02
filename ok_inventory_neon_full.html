@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ระบบคลังสินค้า - Enhanced Import/Export v2 (NEON API) - Full Version</title>
+  <style>
+    *{box-sizing:border-box}
+    body{font-family:'Sarabun','Tahoma',sans-serif;background:#f4f6f8;margin:0;padding:20px}
+    .container{max-width:1200px;margin:0 auto;background:#fff;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.08);overflow:hidden}
+    .header{background:linear-gradient(45deg,#4CAF50,#2E7D32);color:#fff;padding:18px 20px}
+    .header h1{margin:0;font-size:22px}
+    .mode-selector{display:flex;gap:10px;flex-wrap:wrap;padding:14px 16px;border-bottom:1px solid #eee;background:#fafafa}
+    .mode-btn{appearance:none;border:1px solid #e0e0e0;background:#fff;border-radius:999px;padding:10px 16px;font-size:14px;color:#333;cursor:pointer;transition:all .2s}
+    .mode-btn.active{background:#4CAF50;border-color:#4CAF50;color:#fff}
+    .mode-content{display:none;padding:16px}
+    .mode-content.active{display:block}
+    .subtabs{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 14px}
+    .subtab-btn{appearance:none;border:1px solid #e0e0e0;background:#fff;border-radius:999px;padding:8px 12px;font-size:13px;color:#333;cursor:pointer}
+    .subtab-btn.active{background:#2196F3;border-color:#2196F3;color:#fff}
+    .subtab-content{display:none}
+    .subtab-content.active{display:block}
+    .form-row{display:flex;gap:12px;flex-wrap:wrap}
+    .form-group{flex:1;min-width:220px}
+    label{display:block;margin-bottom:6px;font-weight:600;color:#333}
+    input[type="text"],input[type="number"],textarea,select{width:100%;padding:10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px}
+    input[type="file"]{width:100%;}
+    textarea{resize:vertical}
+    .actions{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+    .btn{border:none;border-radius:8px;padding:10px 14px;font-size:14px;color:#fff;background:#4CAF50;cursor:pointer}
+    .btn.secondary{background:#2196F3}
+    .btn.danger{background:#F44336}
+    .btn.warning{background:#FF9800}
+    .btn.gray{background:#607D8B}
+    .btn.light{background:#9E9E9E}
+    .btn.silver{background:#9E9E9E}
+    .btn:disabled{background:#ccc;cursor:not-allowed}
+    .table-container{overflow-x:auto;margin-top:10px}
+    table{width:100%;border-collapse:collapse;background:#fff}
+    th,td{padding:10px;border-bottom:1px solid #eee;text-align:left;font-size:14px;vertical-align:middle}
+    th{background:#fafafa}
+    .thumb{width:44px;height:44px;object-fit:cover;border-radius:6px;border:1px solid #eee;cursor:zoom-in}
+    .status-badge{padding:2px 8px;border-radius:12px;font-size:12px;font-weight:700;display:inline-block}
+    .status-ok{background:#d4edda;color:#1b5e20}
+    .status-buy{background:#fff3cd;color:#7a5d00}
+    .status-pending{background:#e3f2fd;color:#0d47a1}
+    .status-done{background:#e8f5e9;color:#1b5e20}
+    .status-approved{background:#d4edda;color:#1b5e20}
+    .status-rejected{background:#ffebee;color:#b71c1c}
+    .status-ordered{background:#fff3cd;color:#7a5d00}
+    .hint{font-size:12px;color:#777;margin-top:4px}
+    .muted{color:#777;font-size:12px}
+    .divider{height:1px;background:#eee;margin:8px 0}
+    .modal{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center;z-index:9999}
+    .modal img{max-width:90vw;max-height:90vh;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+    <h1>📦 ระบบจัดการคลังสินค้า (เชื่อม NEON API) - Full Version</h1>
+    <div>SPR, PR และ Stock พร้อม Admin แยก, Import/Export, รูปภาพ</div>
+    </div>
+
+    <div class="mode-selector" id="modeSelector">
+    <button class="mode-btn active" data-target="#spr-mode">📋 SPR Mode</button>
+    <button class="mode-btn" data-target="#pr-mode">🛒 PR Mode</button>
+    <button class="mode-btn" data-target="#stock-mode">📦 Stock</button>
+    </div>
+
+    <!-- SPR -->
+    <div id="spr-mode" class="mode-content active">
+    <h3>SPR - ใบเบิกออกจากคลัง</h3>
+    <div class="actions" style="margin-top:0">
+    <button class="btn gray" id="btn-spr-admin-login">🔐 เข้าสู่ระบบ Admin (SPR) — รหัส: spr123</button>
+    <button class="btn light" id="btn-spr-admin-logout">🚪 ออกจากระบบ (SPR)</button>
+    <button class="btn warning" id="btn-spr-change-pass" disabled>🔑 ตั้งรหัสใหม่ (SPR)</button>
+    <span id="spr-admin-state" class="muted">สถานะ SPR: ผู้ใช้ทั่วไป</span>
+    </div>
+
+    <div class="subtabs" id="sprSubtabs">
+    <button class="subtab-btn active" data-target="#spr-cart">SPR Cart</button>
+    <button class="subtab-btn" data-target="#spr-history">History</button>
+    </div>
+
+    <!-- SPR Cart -->
+    <div id="spr-cart" class="subtab-content active">
+    <div class="form-row">
+    <div class="form-group">
+    <label>ค้นหา (รหัส/ชื่อ)</label>
+    <input type="text" id="spr-search" placeholder="ค้นหาจากรหัส หรือ ชื่อสินค้า" />
+    <label style="margin-top:8px">เลือกสินค้า</label>
+    <select id="spr-product-select"></select>
+    </div>
+    <div class="form-group">
+    <label>จำนวน</label>
+    <input type="number" id="spr-quantity" min="1" value="1" />
+    </div>
+    </div>
+    <div class="form-group">
+    <label>ชื่อผู้เบิก</label>
+    <input type="text" id="spr-requester" placeholder="ไม่ระบุได้" />
+    </div>
+    <div class="actions">
+    <button class="btn" id="spr-add">➕ เพิ่มลง SPR Cart</button>
+    <div class="divider"></div>
+    <button class="btn secondary" id="spr-export-cart">📤 Export SPR Cart (CSV)</button>
+    <button class="btn silver" id="spr-import-cart">📥 Import SPR Cart (CSV)</button>
+    </div>
+    <div class="table-container">
+    <table>
+    <thead>
+    <tr>
+    <th>#</th><th>รูป</th><th>รหัสสินค้า</th><th>ชื่อสินค้า</th><th>จำนวน</th><th>ผู้เบิก</th><th>สถานะ</th><th>เวลา</th><th>จัดการ</th>
+    </tr>
+    </thead>
+    <tbody id="spr-body"><tr><td colspan="9" style="text-align:center;color:#777">ยังไม่มีรายการ</td></tr></tbody>
+    </table>
+    </div>
+    <div class="muted">หมายเหตุ: ปุ่ม "เปลี่ยนสถานะ" และ "ลบ" ใช้ได้เฉพาะ Admin SPR</div>
+    </div>
+
+    <!-- SPR History -->
+    <div id="spr-history" class="subtab-content">
+    <div class="actions">
+    <button class="btn secondary" id="spr-export-history">📤 Export SPR History (CSV)</button>
+    <button class="btn silver" id="spr-import-history">📥 Import SPR History (CSV)</button>
+    </div>
+    <div class="table-container">
+    <table>
+    <thead>
+    <tr>
+    <th>#</th><th>รูป</th><th>วันที่</th><th>ผู้เบิก</th><th>รหัสสินค้า</th><th>ชื่อสินค้า</th><th>จำนวน</th><th>สถานะ</th>
+    </tr>
+    </thead>
+    <tbody id="spr-history-body"><tr><td colspan="8" style="text-align:center;color:#777">ยังไม่มีประวัติ SPR</td></tr></tbody>
+    </table>
+    </div>
+    <div class="muted">หมายเหตุ: ปุ่ม "ลบ" ใช้ได้เฉพาะ Admin SPR</div>
+    </div>
+    </div>
+
+    <!-- PR -->
+    <div id="pr-mode" class="mode-content">
+    <h3>PR - คำร้องขอสั่งซื้อ</h3>
+    <div class="actions" style="margin-top:0">
+    <button class="btn gray" id="btn-pr-admin-login">🔐 เข้าสู่ระบบ Admin (PR) — รหัส: admin123</button>
+    <button class="btn light" id="btn-pr-admin-logout">🚪 ออกจากระบบ (PR)</button>
+    <button class="btn warning" id="btn-pr-change-pass" disabled>🔑 ตั้งรหัสใหม่ (PR)</button>
+    <span id="pr-admin-state" class="muted">สถานะ PR: ผู้ใช้ทั่วไป</span>
+    </div>
+
+    <div class="subtabs" id="prSubtabs">
+    <button class="subtab-btn active" data-target="#pr-cart">PR Cart</button>
+    <button class="subtab-btn" data-target="#pr-history">History</button>
+    </div>
+
+    <!-- PR Cart -->
+    <div id="pr-cart" class="subtab-content active">
+    <div class="form-row">
+    <div class="form-group">
+    <label>รหัสสินค้า (ไม่จำเป็นต้องกรอก)</label>
+    <input type="text" id="pr-code" placeholder="เช่น ITEM001 (สามารถปล่อยว่างได้)" />
+    </div>
+    <div class="form-group">
+    <label>ชื่อสินค้า</label>
+    <input type="text" id="pr-name" placeholder="ระบุชื่อสินค้า หรือเลือกจากรายการสต็อก" list="stock-items-list" />
+    <datalist id="stock-items-list"></datalist>
+    <div class="hint">สามารถพิมพ์ชื่อสินค้า หรือเลือกจากรายการที่มีในสต็อก</div>
+    </div>
+    <div class="form-group">
+    <label>จำนวน</label>
+    <input type="number" id="pr-qty" min="1" value="1" />
+    </div>
+    <div class="form-group">
+    <label>รูปภาพ</label>
+    <input type="file" id="pr-image" accept="image/*" />
+    </div>
+    </div>
+    <div class="form-row">
+    <div class="form-group">
+    <label>ชื่อผู้ขอ</label>
+    <input type="text" id="pr-requester" placeholder="ไม่ระบุก็ได้" />
+    </div>
+    <div class="form-group">
+    <label>Code Job</label>
+    <input type="text" id="pr-job" />
+    </div>
+    <div class="form-group">
+    <label>Remark</label>
+    <input type="text" id="pr-remark" />
+    </div>
+    </div>
+    <div class="actions">
+    <button class="btn" id="pr-add">➕ เพิ่มลง PR Cart</button>
+    <div class="divider"></div>
+    <button class="btn secondary" id="pr-export-cart">📤 Export PR Cart (CSV)</button>
+    <button class="btn silver" id="pr-import-cart">📥 Import PR Cart (CSV)</button>
+    </div>
+    <div class="table-container">
+    <table>
+    <thead>
+    <tr>
+    <th>#</th><th>รูป</th><th>รหัสสินค้า</th><th>ชื่อสินค้า</th><th>จำนวน</th><th>ผู้ขอ</th><th>Job</th><th>Remark</th><th>เวลา</th><th>สถานะ</th><th>การดำเนินการ</th>
+    </tr>
+    </thead>
+    <tbody id="pr-body"><tr><td colspan="11" style="text-align:center;color:#777">ยังไม่มีรายการ</td></tr></tbody>
+    </table>
+    </div>
+    <div class="muted">หมายเหตุ: ปุ่ม "เปลี่ยนสถานะ" และ "ลบ" ใช้ได้เฉพาะ Admin PR</div>
+    </div>
+
+    <!-- PR History -->
+    <div id="pr-history" class="subtab-content">
+    <div class="actions">
+    <button class="btn secondary" id="pr-export-history">📤 Export PR History (CSV)</button>
+    <button class="btn silver" id="pr-import-history">📥 Import PR History (CSV)</button>
+    </div>
+    <div class="table-container">
+    <table>
+    <thead>
+    <tr>
+    <th>#</th><th>รูป</th><th>วันที่</th><th>ผู้เบิก</th><th>รหัสสินค้า</th><th>ชื่อสินค้า</th><th>จำนวน</th><th>สถานะ</th><th>การดำเนินการ</th>
+    </tr>
+    </thead>
+    <tbody id="pr-history-body"><tr><td colspan="9" style="text-align:center;color:#777">ยังไม่มีประวัติ PR</td></tr></tbody>
+    </table>
+    </div>
+    </div>
+    </div>
+
+    <!-- Stock -->
+    <div id="stock-mode" class="mode-content">
+    <h3>Stock - คลังสินค้า</h3>
+    <div class="actions" style="margin-top:0">
+    <button class="btn gray" id="btn-stock-admin-login">🔐 เข้าสู่ระบบ Admin (Stock) — admin1: stock111, admin2: stock222</button>
+    <button class="btn light" id="btn-stock-admin-logout">🚪 ออกจากระบบ (Stock)</button>
+    <button class="btn warning" id="btn-stock-change-pass" disabled>🔑 ตั้งรหัสใหม่ (Stock)</button>
+    <span id="stock-admin-state" class="muted">สถานะ Stock: ผู้ใช้ทั่วไป</span>
+    </div>
+    <div class="subtabs" id="stockSubtabs">
+    <button class="subtab-btn active" data-target="#stock-items">สินค้า</button>
+    <button class="subtab-btn" data-target="#stock-history">History</button>
+    </div>
+
+    <!-- Subtab: Items -->
+    <div id="stock-items" class="subtab-content active">
+    <div class="form-row">
+    <div class="form-group">
+    <label>รหัสสินค้า (รองรับบาร์โค้ด — สแกนแล้วกด Enter)</label>
+    <input type="text" id="st-code" />
+    </div>
+    <div class="form-group">
+    <label>ชื่อสินค้า</label>
+    <input type="text" id="st-name" />
+    </div>
+    <div class="form-group">
+    <label>จำนวน (รองรับ +5 / -3 / หรือ 20)</label>
+    <input type="text" id="st-qty" value="1" />
+    </div>
+    <div class="form-group">
+    <label>ราคา</label>
+    <input type="number" id="st-price" min="0" step="0.01" />
+    </div>
+    <div class="form-group">
+    <label>Minimum Stock (ชิ้น)</label>
+    <input type="number" id="st-min" min="0" step="1" placeholder="0" />
+    </div>
+    <div class="form-group">
+    <label>รูปภาพสินค้า</label>
+    <input type="file" id="st-image" accept="image/*" />
+    </div>
+    </div>
+    <div class="actions">
+    <button class="btn" id="st-add" disabled>➕ เพิ่มเข้าคลัง (บวกจำนวนถ้ามีอยู่แล้ว)</button>
+    <button class="btn warning" id="st-update" disabled>🔄 อัปเดต (รองรับ + / - / เซ็ตค่า + ปรับ Min)</button>
+    <button class="btn secondary" id="st-export">📤 Export สต็อก</button>
+    <button class="btn silver" id="st-import">📥 Import สต็อก</button>
+    <button class="btn danger" id="st-clear" disabled>🗑️ ล้างคลัง</button>
+    </div>
+    <div class="table-container">
+    <table>
+    <thead>
+    <tr>
+    <th>รหัส</th><th>รูป</th><th>ชื่อ</th><th>ราคา</th><th>จำนวน</th><th>Minimum</th><th>สถานะ</th><th>มูลค่า</th><th>อัพเดท</th><th>จัดการ</th>
+    </tr>
+    </thead>
+    <tbody id="st-body"><tr><td colspan="10" style="text-align:center;color:#777">ยังไม่มีสินค้า</td></tr></tbody>
+    </table>
+    </div>
+    <div class="muted">หมายเหตุ: ต้องเข้าสู่ระบบ Admin (admin1 หรือ admin2) เท่านั้น ถึงจะเพิ่ม/ลบ/อัปเดตสินค้าได้</div>
+    </div>
+
+    <!-- Subtab: History -->
+    <div id="stock-history" class="subtab-content">
+    <div class="actions">
+    <button class="btn secondary" id="his-export">📤 Export History</button>
+    <button class="btn danger" id="his-clear" disabled>🗑️ ล้างประวัติ</button>
+    </div>
+    <div class="table-container">
+    <table>
+    <thead>
+    <tr>
+    <th>เวลา</th><th>รูป</th><th>รหัสสินค้า</th><th>ชื่อ</th><th>การเปลี่ยนแปลง</th><th>ประเภท</th><th>ผู้ทำรายการ</th><th>ลบ</th>
+    </tr>
+    </thead>
+    <tbody id="his-body"><tr><td colspan="8" style="text-align:center;color:#777">ยังไม่มีประวัติ</td></tr></tbody>
+    </table>
+    </div>
+    <div class="muted">หมายเหตุ: ต้องเข้าสู่ระบบ Admin (admin1 หรือ admin2) เท่านั้น ถึงจะล้างประวัติได้</div>
+    </div>
+    </div>
+  </div>
+
+  <!-- Image modal -->
+  <div id="imgModal" class="modal" onclick="this.style.display='none'">
+    <img id="imgModalPic" src="" alt="preview" />
+  </div>
+
+  <script>
+    // --- State ---
+    let stock = [];
+    let spr = [];
+    let sprHistory = [];
+    let pr = [];
+    let prHistory = [];
+    let stockHistory = [];
+
+    if(!localStorage.getItem('prAdminPass')) localStorage.setItem('prAdminPass','admin123');
+    if(!localStorage.getItem('sprAdminPass')) localStorage.setItem('sprAdminPass','spr123');
+    if(!localStorage.getItem('stockAdmin1Pass')) localStorage.setItem('stockAdmin1Pass','stock111');
+    if(!localStorage.getItem('stockAdmin2Pass')) localStorage.setItem('stockAdmin2Pass','stock222');
+
+    let isPRAdmin = sessionStorage.getItem('isPRAdmin') === 'true';
+    let isSPRAdmin = sessionStorage.getItem('isSPRAdmin') === 'true';
+    let isStockAdmin = sessionStorage.getItem('isStockAdmin') === 'true';
+    let stockAdminUser = sessionStorage.getItem('stockAdminUser') || null; // 'admin1' | 'admin2'
+
+    // NEON API Config
+    const NEON_API_BASE = '/.netlify/functions/neon-proxy'; // ใช้ proxy function บน Netlify
+
+    // ฟังก์ชันช่วย fetch JSON พร้อม header Authorization (ถ้าใช้ proxy แล้วไม่ต้องใส่ token)
+    async function neonFetchJSON(path, options = {}) {
+      const res = await fetch(NEON_API_BASE + path, options);
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`API error ${res.status}: ${errText}`);
+      }
+      return res.json();
+    }
+
+    // ฟังก์ชันอ่านไฟล์รูปเป็น base64
+    function readFileAsDataURL(file) {
+      return new Promise((resolve) => {
+        if (!file) { resolve(''); return; }
+        const reader = new FileReader();
+        reader.onload = e => resolve(e.target.result || '');
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // ฟังก์ชันจัดการรูปภาพ (resize/compress) เหมือนเดิม
+    async function processImageFile(file, mode) {
+      if (!file) return '';
+      const common = { maxW: 1024, maxH: 1024, maxKB: 300 };
+      return await readAndResizeImage(file, common);
+    }
+
+    async function readAndResizeImage(file, opts = {}) {
+      if (!file) return '';
+      const {
+        maxW = 1024,
+        maxH = 1024,
+        maxKB = 300,
+        outputType = 'image/jpeg',
+        qualityStart = 0.8,
+        qualityMin = 0.5
+      } = opts;
+      function approxKB(dataUrl) {
+        const base64 = (dataUrl.split(',')[1] || '');
+        return Math.ceil((base64.length * 3 / 4) / 1024);
+      }
+      return await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            let w = img.naturalWidth || img.width;
+            let h = img.naturalHeight || img.height;
+            const ratio = Math.min(maxW / w, maxH / h, 1);
+            const cw = Math.max(1, Math.round(w * ratio));
+            const ch = Math.max(1, Math.round(h * ratio));
+            const canvas = document.createElement('canvas');
+            canvas.width = cw; canvas.height = ch;
+            const ctx = canvas.getContext('2d');
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(img, 0, 0, cw, ch);
+            let q = qualityStart;
+            let out = canvas.toDataURL(outputType, q);
+            while (approxKB(out) > maxKB && q > qualityMin) {
+              q = Math.max(qualityMin, q - 0.1);
+              out = canvas.toDataURL(outputType, q);
+            }
+            if (approxKB(out) > maxKB) {
+              alert(`ไฟล์รูปยังมีขนาดเกิน ${maxKB}KB หลังย่อแล้ว กรุณาเลือกรูปที่เล็กลง`);
+              resolve('');
+            } else {
+              resolve(out);
+            }
+          };
+          img.onerror = () => resolve('');
+          img.src = e.target.result;
+        };
+        reader.onerror = () => resolve('');
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // --- ฟังก์ชัน render ตารางและ event handlers ---
+
+    // SPR
+    function renderSPR() {
+      const tbody = document.getElementById('spr-body');
+      tbody.innerHTML = '';
+      if (spr.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#777">ยังไม่มีรายการ</td></tr>';
+        return;
+      }
+      spr.forEach((item, i) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${i + 1}</td>
+          <td><img src="${item.imageData || ''}" alt="รูป" class="thumb" onclick="showImageModal('${item.imageData}')"></td>
+          <td>${item.code}</td>
+          <td>${item.name}</td>
+          <td>${item.quantity}</td>
+          <td>${item.requester}</td>
+          <td><span class="status-badge status-pending">${item.status}</span></td>
+          <td>${item.timestamp}</td>
+          <td>
+            ${isSPRAdmin ? `
+              <button class="btn warning" onclick="changeSPRStatus(${i}, 'done')">เปลี่ยนสถานะ</button>
+              <button class="btn danger" onclick="deleteSPRItem(${i})">ลบ</button>
+            ` : ''}
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function changeSPRStatus(index, newStatus) {
+      if (!isSPRAdmin) return alert('ต้องเป็น Admin SPR เท่านั้น');
+      spr[index].status = newStatus;
+      spr[index].timestamp = new Date().toLocaleString('th-TH');
+      await saveSPR(spr[index]);
+      await loadSPR();
+    }
+
+    async function deleteSPRItem(index) {
+      if (!isSPRAdmin) return alert('ต้องเป็น Admin SPR เท่านั้น');
+      // TODO: เพิ่ม API ลบถ้ามี
+      spr.splice(index, 1);
+      await loadSPR();
+    }
+
+    function renderSPRHistory() {
+      const tbody = document.getElementById('spr-history-body');
+      tbody.innerHTML = '';
+      if (sprHistory.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#777">ยังไม่มีประวัติ SPR</td></tr>';
+        return;
+      }
+      sprHistory.forEach((item, i) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${i + 1}</td>
+          <td><img src="${item.imageData || ''}" alt="รูป" class="thumb" onclick="showImageModal('${item.imageData}')"></td>
+          <td>${item.timestamp}</td>
+          <td>${item.requester}</td>
+          <td>${item.code}</td>
+          <td>${item.name}</td>
+          <td>${item.quantity}</td>
+          <td><span class="status-badge status-done">${item.status}</span></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // PR
+    function renderPR() {
+      const tbody = document.getElementById('pr-body');
+      tbody.innerHTML = '';
+      if (pr.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:#777">ยังไม่มีรายการ</td></tr>';
+        return;
+      }
+      pr.forEach((item, i) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${i + 1}</td>
+          <td><img src="${item.imageData || ''}" alt="รูป" class="thumb" onclick="showImageModal('${item.imageData}')"></td>
+          <td>${item.code}</td>
+          <td>${item.name}</td>
+          <td>${item.quantity}</td>
+          <td>${item.requester}</td>
+          <td>${item.job}</td>
+          <td>${item.remark}</td>
+          <td>${item.timestamp}</td>
+          <td><span class="status-badge status-pending">${item.status}</span></td>
+          <td>
+            ${isPRAdmin ? `
+              <button class="btn warning" onclick="changePRStatus(${i}, 'approved')">อนุมัติ</button>
+              <button class="btn danger" onclick="deletePRItem(${i})">ลบ</button>
+            ` : ''}
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function changePRStatus(index, newStatus) {
+      if (!isPRAdmin) return alert('ต้องเป็น Admin PR เท่านั้น');
+      pr[index].status = newStatus;
+      pr[index].timestamp = new Date().toLocaleString('th-TH');
+      await savePR(pr[index]);
+      await loadPR();
+    }
+
+    async function deletePRItem(index) {
+      if (!isPRAdmin) return alert('ต้องเป็น Admin PR เท่านั้น');
+      // TODO: เพิ่ม API ลบถ้ามี
+      pr.splice(index, 1);
+      await loadPR();
+    }
+
+    function renderPRHistory() {
+      const tbody = document.getElementById('pr-history-body');
+      tbody.innerHTML = '';
+      if (prHistory.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#777">ยังไม่มีประวัติ PR</td></tr>';
+        return;
+      }
+      prHistory.forEach((item, i) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${i + 1}</td>
+          <td><img src="${item.imageData || ''}" alt="รูป" class="thumb" onclick="showImageModal('${item.imageData}')"></td>
+          <td>${item.timestamp}</td>
+          <td>${item.requester}</td>
+          <td>${item.code}</td>
+          <td>${item.name}</td>
+          <td>${item.quantity}</td>
+          <td><span class="status-badge status-approved">${item.status}</span></td>
+          <td></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Stock
+    function renderStock() {
+      const tbody = document.getElementById('st-body');
+      tbody.innerHTML = '';
+      if (stock.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#777">ยังไม่มีสินค้า</td></tr>';
+        return;
+      }
+      stock.forEach((item, i) => {
+        const statusClass = item.quantity <= item.minQty ? 'status-buy' : 'status-ok';
+        const value = (item.price * item.quantity).toFixed(2);
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${item.code}</td>
+          <td><img src="${item.imageData || ''}" alt="รูป" class="thumb" onclick="showImageModal('${item.imageData}')"></td>
+          <td>${item.name}</td>
+          <td>${item.price.toFixed(2)}</td>
+          <td>${item.quantity}</td>
+          <td>${item.minQty}</td>
+          <td><span class="status-badge ${statusClass}">${item.quantity <= item.minQty ? 'ต้องสั่งซื้อ' : 'ปกติ'}</span></td>
+          <td>${value}</td>
+          <td>${item.timestamp || ''}</td>
+          <td>
+            ${isStockAdmin ? `
+              <button class="btn warning" onclick="editStockItem(${i})">แก้ไข</button>
+              <button class="btn danger" onclick="deleteStockItem(${i})">ลบ</button>
+            ` : ''}
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function editStockItem(index) {
+      if (!isStockAdmin) return alert('ต้องเป็น Admin Stock เท่านั้น');
+      const item = stock[index];
+      document.getElementById('st-code').value = item.code;
+      document.getElementById('st-name').value = item.name;
+      document.getElementById('st-qty').value = item.quantity;
+      document.getElementById('st-price').value = item.price;
+      document.getElementById('st-min').value = item.minQty;
+    }
+
+    async function deleteStockItem(index) {
+      if (!isStockAdmin) return alert('ต้องเป็น Admin Stock เท่านั้น');
+      // TODO: เพิ่ม API ลบถ้ามี
+      stock.splice(index, 1);
+      await loadStock();
+    }
+
+    // --- ฟังก์ชันแสดงรูปภาพขยาย ---
+    function showImageModal(src) {
+      if (!src) return;
+      const modal = document.getElementById('imgModal');
+      const img = document.getElementById('imgModalPic');
+      img.src = src;
+      modal.style.display = 'flex';
+    }
+
+    // --- ฟังก์ชัน export/import CSV ---
+    function exportToCSV(data, filename) {
+      const csvRows = [];
+      if (data.length === 0) return;
+      const headers = Object.keys(data[0]);
+      csvRows.push(headers.join(','));
+      for (const row of data) {
+        const values = headers.map(h => {
+          let val = row[h] === null || row[h] === undefined ? '' : row[h];
+          val = val.toString().replace(/"/g, '""');
+          if (val.search(/([",\n])/g) >= 0) {
+            val = `"${val}"`;
+          }
+          return val;
+        });
+        csvRows.push(values.join(','));
+      }
+      const csvString = csvRows.join('\n');
+      const blob = new Blob([csvString], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.setAttribute('hidden', '');
+      a.setAttribute('href', url);
+      a.setAttribute('download', filename);
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
+    function importFromCSV(file, callback) {
+      const reader = new FileReader();
+      reader.onload = e => {
+        const text = e.target.result;
+        const lines = text.trim().split('\n');
+        const headers = lines[0].split(',');
+        const data = lines.slice(1).map(line => {
+          const values = line.split(',');
+          const obj = {};
+          headers.forEach((h, i) => {
+            obj[h] = values[i];
+          });
+          return obj;
+        });
+        callback(data);
+      };
+      reader.readAsText(file);
+    }
+
+    // --- Event handlers สำหรับ export/import ---
+    document.getElementById('spr-export-cart').addEventListener('click', () => {
+      exportToCSV(spr, 'spr_cart.csv');
+    });
+    document.getElementById('spr-import-cart').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      importFromCSV(file, (data) => {
+        spr = data;
+        renderSPR();
+      });
+      e.target.value = '';
+    });
+
+    document.getElementById('spr-export-history').addEventListener('click', () => {
+      exportToCSV(sprHistory, 'spr_history.csv');
+    });
+    document.getElementById('spr-import-history').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      importFromCSV(file, (data) => {
+        sprHistory = data;
+        renderSPRHistory();
+      });
+      e.target.value = '';
+    });
+
+    document.getElementById('pr-export-cart').addEventListener('click', () => {
+      exportToCSV(pr, 'pr_cart.csv');
+    });
+    document.getElementById('pr-import-cart').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      importFromCSV(file, (data) => {
+        pr = data;
+        renderPR();
+      });
+      e.target.value = '';
+    });
+
+    document.getElementById('pr-export-history').addEventListener('click', () => {
+      exportToCSV(prHistory, 'pr_history.csv');
+    });
+    document.getElementById('pr-import-history').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      importFromCSV(file, (data) => {
+        prHistory = data;
+        renderPRHistory();
+      });
+      e.target.value = '';
+    });
+
+    document.getElementById('st-export').addEventListener('click', () => {
+      exportToCSV(stock, 'stock.csv');
+    });
+    document.getElementById('st-import').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      importFromCSV(file, (data) => {
+        stock = data;
+        renderStock();
+      });
+      e.target.value = '';
+    });
+
+    document.getElementById('his-export').addEventListener('click', () => {
+      exportToCSV(stockHistory, 'stock_history.csv');
+    });
+
+    // --- Event handlers สำหรับปุ่มอื่น ๆ ---
+
+    // SPR
+    document.getElementById('spr-add').addEventListener('click', async () => {
+      const code = document.getElementById('spr-product-select').value;
+      const qty = parseInt(document.getElementById('spr-quantity').value) || 1;
+      const req = (document.getElementById('spr-requester').value || '').trim() || 'ไม่ระบุ';
+      if (!code) return alert('กรุณาเลือกสินค้า');
+      const itemStock = stock.find(x => x.code === code);
+      if (!itemStock) return alert('ไม่พบสินค้าในคลัง');
+      if (itemStock.quantity < qty) return alert('สต็อกไม่พอ');
+      const item = { code, name: itemStock.name, quantity: qty, requester: req, status: 'pending', timestamp: new Date().toLocaleString('th-TH'), imageData: itemStock.imageData || '' };
+      spr.push(item);
+      renderSPR();
+      document.getElementById('spr-quantity').value = 1;
+      document.getElementById('spr-requester').value = '';
+    });
+
+    // PR
+    document.getElementById('pr-add').addEventListener('click', async () => {
+      const code = (document.getElementById('pr-code').value || '').trim();
+      let name = (document.getElementById('pr-name').value || '').trim();
+      const qty = parseInt(document.getElementById('pr-qty').value) || 1;
+      const requester = (document.getElementById('pr-requester').value || '').trim() || 'ไม่ระบุ';
+      const job = (document.getElementById('pr-job').value || '').trim() || 'ไม่ระบุ';
+      const remark = (document.getElementById('pr-remark').value || '').trim() || '-';
+      const file = document.getElementById('pr-image').files[0] || null;
+      if (!name) return alert('กรุณาระบุชื่อสินค้า');
+      const finalCode = code || name;
+      const imageData = await processImageFile(file, 'PR');
+      const item = { code: finalCode, name, quantity: qty, requester, job, remark, status: 'pending', timestamp: new Date().toLocaleString('th-TH'), imageData };
+      pr.push(item);
+      renderPR();
+      document.getElementById('pr-code').value = '';
+      document.getElementById('pr-name').value = '';
+      document.getElementById('pr-qty').value = 1;
+      document.getElementById('pr-image').value = '';
+    });
+
+    // Stock
+    document.getElementById('st-add').addEventListener('click', async () => {
+      if (!isStockAdmin) return alert('ต้องเข้าสู่ระบบ Admin เท่านั้น');
+      const code = (document.getElementById('st-code').value || '').trim();
+      const name = (document.getElementById('st-name').value || '').trim();
+      const qtyRaw = (document.getElementById('st-qty').value || '1').trim();
+      const price = parseFloat(document.getElementById('st-price').value) || 0;
+      const minQty = Math.max(0, parseInt(document.getElementById('st-min').value || '0'));
+      const file = document.getElementById('st-image').files[0] || null;
+      if (!code) return alert('กรุณาระบุรหัสสินค้า');
+      if (!name) return alert('กรุณาระบุชื่อสินค้า');
+      // รองรับ +5, -3, หรือจำนวนตรงๆ
+      let qty = 0;
+      if (qtyRaw.startsWith('+') || qtyRaw.startsWith('-')) {
+        const delta = parseInt(qtyRaw);
+        const existing = stock.find(s => s.code === code);
+        qty = (existing ? existing.quantity : 0) + delta;
+      } else {
+        qty = parseInt(qtyRaw) || 0;
+      }
+      if (qty < 0) qty = 0;
+      const imageData = await processImageFile(file, 'Stock');
+      const existingIndex = stock.findIndex(s => s.code === code);
+      if (existingIndex >= 0) {
+        // อัปเดต
+        stock[existingIndex].name = name;
+        stock[existingIndex].quantity = qty;
+        stock[existingIndex].price = price;
+        stock[existingIndex].minQty = minQty;
+        if (imageData) stock[existingIndex].imageData = imageData;
+      } else {
+        // เพิ่มใหม่
+        stock.push({ code, name, quantity: qty, price, minQty, imageData, timestamp: new Date().toLocaleString('th-TH') });
+      }
+      renderStock();
+      // เคลียร์ฟอร์ม
+      document.getElementById('st-code').value = '';
+      document.getElementById('st-name').value = '';
+      document.getElementById('st-qty').value = '1';
+      document.getElementById('st-price').value = '';
+      document.getElementById('st-min').value = '';
+      document.getElementById('st-image').value = '';
+    });
+
+    document.getElementById('st-update').addEventListener('click', async () => {
+      if (!isStockAdmin) return alert('ต้องเข้าสู่ระบบ Admin เท่านั้น');
+      // ฟังก์ชันนี้สามารถเขียนเพิ่มได้ตามต้องการ
+      alert('ฟังก์ชันอัปเดตสินค้าอยู่ระหว่างพัฒนา');
+    });
+
+    document.getElementById('st-clear').addEventListener('click', async () => {
+      if (!isStockAdmin) return alert('ต้องเข้าสู่ระบบ Admin เท่านั้น');
+      if (confirm('คุณแน่ใจหรือไม่ที่จะล้างคลังสินค้า?')) {
+        stock = [];
+        renderStock();
+      }
+    });
+
+    document.getElementById('his-clear').addEventListener('click', async () => {
+      if (!isStockAdmin) return alert('ต้องเข้าสู่ระบบ Admin เท่านั้น');
+      if (confirm('คุณแน่ใจหรือไม่ที่จะล้างประวัติ?')) {
+        stockHistory = [];
+        renderHistory();
+      }
+    });
+
+    // --- Admin Login/Logout ---
+    document.getElementById('btn-spr-admin-login').addEventListener('click', () => {
+      const pass = prompt('กรุณาใส่รหัสผ่าน Admin SPR');
+      if (pass === localStorage.getItem('sprAdminPass')) {
+        isSPRAdmin = true;
+        sessionStorage.setItem('isSPRAdmin', 'true');
+        alert('เข้าสู่ระบบ Admin SPR สำเร็จ');
+        updateAdminUI();
+      } else {
+        alert('รหัสผ่านไม่ถูกต้อง');
+      }
+    });
+
+    document.getElementById('btn-spr-admin-logout').addEventListener('click', () => {
+      isSPRAdmin = false;
+      sessionStorage.setItem('isSPRAdmin', 'false');
+      alert('ออกจากระบบ Admin SPR แล้ว');
+      updateAdminUI();
+    });
+
+    document.getElementById('btn-pr-admin-login').addEventListener('click', () => {
+      const pass = prompt('กรุณาใส่รหัสผ่าน Admin PR');
+      if (pass === localStorage.getItem('prAdminPass')) {
+        isPRAdmin = true;
+        sessionStorage.setItem('isPRAdmin', 'true');
+        alert('เข้าสู่ระบบ Admin PR สำเร็จ');
+        updateAdminUI();
+      } else {
+        alert('รหัสผ่านไม่ถูกต้อง');
+      }
+    });
+
+    document.getElementById('btn-pr-admin-logout').addEventListener('click', () => {
+      isPRAdmin = false;
+      sessionStorage.setItem('isPRAdmin', 'false');
+      alert('ออกจากระบบ Admin PR แล้ว');
+      updateAdminUI();
+    });
+
+    document.getElementById('btn-stock-admin-login').addEventListener('click', () => {
+      const user = prompt('กรุณาใส่ชื่อผู้ใช้ Admin Stock (admin1 หรือ admin2)');
+      const pass = prompt('กรุณาใส่รหัสผ่าน Admin Stock');
+      if ((user === 'admin1' && pass === localStorage.getItem('stockAdmin1Pass')) ||
+          (user === 'admin2' && pass === localStorage.getItem('stockAdmin2Pass'))) {
+        isStockAdmin = true;
+        stockAdminUser = user;
+        sessionStorage.setItem('isStockAdmin', 'true');
+        sessionStorage.setItem('stockAdminUser', user);
+        alert(`เข้าสู่ระบบ Admin Stock สำเร็จ: ${user}`);
+        updateAdminUI();
+      } else {
+        alert('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+      }
+    });
+
+    document.getElementById('btn-stock-admin-logout').addEventListener('click', () => {
+      isStockAdmin = false;
+      stockAdminUser = null;
+      sessionStorage.setItem('isStockAdmin', 'false');
+      sessionStorage.removeItem('stockAdminUser');
+      alert('ออกจากระบบ Admin Stock แล้ว');
+      updateAdminUI();
+    });
+
+    // --- ฟังก์ชันอัปเดต UI ตามสถานะ admin ---
+    function updateAdminUI() {
+      document.getElementById('spr-admin-state').textContent = isSPRAdmin ? 'สถานะ SPR: Admin' : 'สถานะ SPR: ผู้ใช้ทั่วไป';
+      document.getElementById('pr-admin-state').textContent = isPRAdmin ? 'สถานะ PR: Admin' : 'สถานะ PR: ผู้ใช้ทั่วไป';
+      document.getElementById('stock-admin-state').textContent = isStockAdmin ? `สถานะ Stock: Admin (${stockAdminUser})` : 'สถานะ Stock: ผู้ใช้ทั่วไป';
+
+      document.getElementById('btn-spr-change-pass').disabled = !isSPRAdmin;
+      document.getElementById('btn-pr-change-pass').disabled = !isPRAdmin;
+      document.getElementById('st-add').disabled = !isStockAdmin;
+      document.getElementById('st-update').disabled = !isStockAdmin;
+      document.getElementById('st-clear').disabled = !isStockAdmin;
+      document.getElementById('his-clear').disabled = !isStockAdmin;
+    }
+
+    // --- ฟังก์ชันโหลดข้อมูลและ render ---
+    async function loadSPR() {
+      // TODO: โหลดจาก API แทน localStorage
+      renderSPR();
+      renderSPRHistory();
+    }
+
+    async function loadPR() {
+      renderPR();
+      renderPRHistory();
+    }
+
+    async function loadStock() {
+      renderStock();
+    }
+
+    // --- โหมดเลือก (Mode Selector) ---
+    document.querySelectorAll('.mode-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const target = btn.getAttribute('data-target');
+        document.querySelectorAll('.mode-content').forEach(c => c.classList.remove('active'));
+        document.querySelector(target).classList.add('active');
+      });
+    });
+
+    // --- Subtabs ---
+    document.querySelectorAll('.subtab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const parent = btn.closest('.mode-content');
+        parent.querySelectorAll('.subtab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const target = btn.getAttribute('data-target');
+        parent.querySelectorAll('.subtab-content').forEach(c => c.classList.remove('active'));
+        parent.querySelector(target).classList.add('active');
+      });
+    });
+
+    // --- โหลดข้อมูลตอนเริ่มต้น ---
+    window.onload = async () => {
+      await loadStock();
+      await loadSPR();
+      await loadPR();
+      updateAdminUI();
+      // เติม select สินค้าใน SPR
+      fillSPRSelect();
+      // เติม datalist สินค้าใน PR
+      fillStockDatalist();
+    };
+
+    // --- เติม select สินค้าใน SPR ---
+    function fillSPRSelect() {
+      const select = document.getElementById('spr-product-select');
+      select.innerHTML = '';
+      stock.forEach(item => {
+        const option = document.createElement('option');
+        option.value = item.code;
+        option.textContent = `${item.code} - ${item.name}`;
+        select.appendChild(option);
+      });
+    }
+
+    // --- เติม datalist สินค้าใน PR ---
+    function fillStockDatalist() {
+      const datalist = document.getElementById('stock-items-list');
+      datalist.innerHTML = '';
+      stock.forEach(item => {
+        const option = document.createElement('option');
+        option.value = item.name;
+        datalist.appendChild(option);
+      });
+    }
+  </script>
+</body>
+</html>
